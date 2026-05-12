@@ -2,7 +2,10 @@ package provider
 
 import (
 	"context"
+	"fmt"
+	"net/http"
 	"os"
+	"time"
 
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/function"
@@ -24,9 +27,27 @@ type OpusDNSProvider struct {
 }
 
 // OpusDNSProviderModel describes the provider data model.
+//
+// Authentication follows the OAuth2 flow described in
+// api/dev-resources/neovim-api-requests/api-key-connect-test.http.
+//
+// Two credential modes are supported, with `client_secret` taking precedence:
+//
+//  1. Pre-minted client credentials (preferred for automation): supply
+//     `org_id` + `client_secret` (and optionally `api_key` for logging). The
+//     provider performs only the final /v1/auth/token client_credentials
+//     exchange to obtain a bearer access token.
+//  2. User password grant: supply `username` + `password` + `org_id`. The
+//     provider runs the full 3-step flow (password grant -> mint
+//     api_key/client_secret -> client_credentials grant). A new API key is
+//     minted on every Configure call.
 type OpusDNSProviderModel struct {
-	APIKey      types.String `tfsdk:"api_key"`
-	APIEndpoint types.String `tfsdk:"api_endpoint"`
+	Username     types.String `tfsdk:"username"`
+	Password     types.String `tfsdk:"password"`
+	OrgID        types.String `tfsdk:"org_id"`
+	APIKey       types.String `tfsdk:"api_key"`
+	ClientSecret types.String `tfsdk:"client_secret"`
+	APIEndpoint  types.String `tfsdk:"api_endpoint"`
 }
 
 // New returns a provider.Provider.
@@ -45,10 +66,31 @@ func (p *OpusDNSProvider) Metadata(_ context.Context, _ provider.MetadataRequest
 
 func (p *OpusDNSProvider) Schema(_ context.Context, _ provider.SchemaRequest, resp *provider.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		MarkdownDescription: "The OpusDNS provider manages DNS zones, records, contacts, email forwards, and domain forwards via the OpusDNS API.",
+		MarkdownDescription: "The OpusDNS provider manages DNS zones, records, contacts, email forwards, and domain forwards via the OpusDNS API. " +
+			"Authentication is performed via the `/v1/auth` OAuth2 endpoints. Two modes are supported (in priority order): " +
+			"(1) supply pre-minted `client_secret` (with `org_id`) to skip directly to the client_credentials grant; " +
+			"(2) supply `username` + `password` (with `org_id`) to run the full password \u2192 mint \u2192 client_credentials flow.",
 		Attributes: map[string]schema.Attribute{
+			"username": schema.StringAttribute{
+				MarkdownDescription: "OpusDNS user username for the password grant. Ignored when `client_secret` is set. Can also be set via the `OPUSDNS_USERNAME` environment variable.",
+				Optional:            true,
+			},
+			"password": schema.StringAttribute{
+				MarkdownDescription: "OpusDNS user password for the password grant. Ignored when `client_secret` is set. Can also be set via the `OPUSDNS_PASSWORD` environment variable.",
+				Optional:            true,
+				Sensitive:           true,
+			},
+			"org_id": schema.StringAttribute{
+				MarkdownDescription: "OpusDNS organization id (used as the `client_id` in the client_credentials grant, e.g. `organization_...`). Required. Can also be set via the `OPUSDNS_ORG_ID` environment variable.",
+				Optional:            true,
+			},
 			"api_key": schema.StringAttribute{
-				MarkdownDescription: "OpusDNS API key. Can also be set via the `OPUSDNS_API_KEY` environment variable.",
+				MarkdownDescription: "Pre-minted OpusDNS API key (the `api_key` returned by `/v1/auth/client_credentials`). Optional companion to `client_secret`; not required for the token exchange but accepted for completeness/logging. Can also be set via the `OPUSDNS_API_KEY` environment variable.",
+				Optional:            true,
+				Sensitive:           true,
+			},
+			"client_secret": schema.StringAttribute{
+				MarkdownDescription: "Pre-minted OpusDNS client secret (the `client_secret` returned by `/v1/auth/client_credentials`). When set (together with `org_id`), the provider skips the user password grant and the API-key minting step, and exchanges the secret directly for a bearer access token. Can also be set via the `OPUSDNS_CLIENT_SECRET` environment variable.",
 				Optional:            true,
 				Sensitive:           true,
 			},
@@ -67,29 +109,87 @@ func (p *OpusDNSProvider) Configure(ctx context.Context, req provider.ConfigureR
 		return
 	}
 
-	apiKey := os.Getenv("OPUSDNS_API_KEY")
-	if !data.APIKey.IsNull() {
-		apiKey = data.APIKey.ValueString()
-	}
+	username := firstNonEmpty(stringValue(data.Username), os.Getenv("OPUSDNS_USERNAME"))
+	password := firstNonEmpty(stringValue(data.Password), os.Getenv("OPUSDNS_PASSWORD"))
+	orgID := firstNonEmpty(stringValue(data.OrgID), os.Getenv("OPUSDNS_ORG_ID"))
+	clientSecret := firstNonEmpty(stringValue(data.ClientSecret), os.Getenv("OPUSDNS_CLIENT_SECRET"))
+	// api_key is accepted but not strictly required for the token exchange.
+	_ = firstNonEmpty(stringValue(data.APIKey), os.Getenv("OPUSDNS_API_KEY"))
+	endpoint := firstNonEmpty(stringValue(data.APIEndpoint), os.Getenv("OPUSDNS_API_ENDPOINT"), opusdns.DefaultAPIEndpoint)
 
-	if apiKey == "" {
+	// org_id is required for both auth modes (it's the client_id in the
+	// client_credentials grant).
+	if orgID == "" {
 		resp.Diagnostics.AddError(
-			"Missing OpusDNS API Key",
-			"The provider cannot create an OpusDNS API client because an API key was not supplied. "+
-				"Set the api_key provider attribute or the OPUSDNS_API_KEY environment variable.",
+			"Missing OpusDNS Credentials",
+			"`org_id` (or the OPUSDNS_ORG_ID environment variable) is required.",
 		)
 		return
 	}
 
-	opts := []opusdns.Option{
-		opusdns.WithAPIKey(apiKey),
-		opusdns.WithUserAgent("terraform-provider-opusdns/" + p.version),
+	auth := &authClient{
+		endpoint: endpoint,
+		http:     &http.Client{Timeout: 30 * time.Second},
 	}
 
-	if !data.APIEndpoint.IsNull() && data.APIEndpoint.ValueString() != "" {
-		opts = append(opts, opusdns.WithAPIEndpoint(data.APIEndpoint.ValueString()))
-	} else if endpoint := os.Getenv("OPUSDNS_API_ENDPOINT"); endpoint != "" {
-		opts = append(opts, opusdns.WithAPIEndpoint(endpoint))
+	var (
+		accessToken string
+		err         error
+	)
+
+	switch {
+	case clientSecret != "":
+		// Preferred path: skip user login and api_key minting; go straight to
+		// the client_credentials grant with the pre-minted secret.
+		accessToken, err = auth.clientCredentialsGrant(ctx, orgID, clientSecret)
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"OpusDNS Authentication Failed",
+				fmt.Sprintf("client_credentials grant against %s failed: %s", endpoint, err.Error()),
+			)
+			return
+		}
+
+	case username != "" && password != "":
+		// Fallback path: full 3-step flow. A new API key is minted on every
+		// Configure call.
+		apiKeyName := fmt.Sprintf("terraform-provider-opusdns-%s-%d", p.version, time.Now().UnixNano())
+		accessToken, _, _, err = auth.login(ctx, username, password, orgID, apiKeyName, "Auto-generated by terraform-provider-opusdns")
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"OpusDNS Authentication Failed",
+				fmt.Sprintf("Failed to obtain bearer token from %s: %s", endpoint, err.Error()),
+			)
+			return
+		}
+
+	default:
+		resp.Diagnostics.AddError(
+			"Missing OpusDNS Credentials",
+			"Provide either `client_secret` (preferred, with `org_id`) or `username` + `password` (with `org_id`). "+
+				"Equivalent environment variables: OPUSDNS_CLIENT_SECRET, or OPUSDNS_USERNAME + OPUSDNS_PASSWORD.",
+		)
+		return
+	}
+
+	// Build an http.Client whose transport injects `Authorization: Bearer <token>`
+	// in place of the SDK's default `X-Api-Key` header.
+	httpClient := &http.Client{
+		Timeout: opusdns.DefaultTimeout,
+		Transport: &bearerTransport{
+			token: accessToken,
+			base:  http.DefaultTransport,
+		},
+	}
+
+	opts := []opusdns.Option{
+		// APIKey is required by the SDK's Validate() but is stripped by our
+		// transport before the request leaves the process. Set it to the bearer
+		// token so any code path that inspects it still has a non-empty value.
+		opusdns.WithAPIKey(accessToken),
+		opusdns.WithAPIEndpoint(endpoint),
+		opusdns.WithUserAgent("terraform-provider-opusdns/" + p.version),
+		opusdns.WithHTTPClient(httpClient),
 	}
 
 	client, err := opusdns.NewClient(opts...)
@@ -124,4 +224,22 @@ func (p *OpusDNSProvider) DataSources(_ context.Context) []func() datasource.Dat
 
 func (p *OpusDNSProvider) Functions(_ context.Context) []func() function.Function {
 	return []func() function.Function{}
+}
+
+// stringValue returns the underlying string of a types.String, or "" if null/unknown.
+func stringValue(s types.String) string {
+	if s.IsNull() || s.IsUnknown() {
+		return ""
+	}
+	return s.ValueString()
+}
+
+// firstNonEmpty returns the first non-empty string from the provided list.
+func firstNonEmpty(values ...string) string {
+	for _, v := range values {
+		if v != "" {
+			return v
+		}
+	}
+	return ""
 }
