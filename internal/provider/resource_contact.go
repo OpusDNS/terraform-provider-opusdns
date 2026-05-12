@@ -33,8 +33,8 @@ type ContactResourceModel struct {
 	Org        types.String `tfsdk:"org"`
 	Title      types.String `tfsdk:"title"`
 	Email      types.String `tfsdk:"email"`
-	Phone      types.String `tfsdk:"phone"`
-	Fax        types.String `tfsdk:"fax"`
+	Phone      phoneValue   `tfsdk:"phone"`
+	Fax        phoneValue   `tfsdk:"fax"`
 	Street     types.String `tfsdk:"street"`
 	City       types.String `tfsdk:"city"`
 	State      types.String `tfsdk:"state"`
@@ -97,22 +97,16 @@ func (r *ContactResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 				PlanModifiers:       requiresReplace,
 			},
 			"phone": schema.StringAttribute{
+				CustomType:          phoneType{},
 				Required:            true,
-				Computed:            true,
-				MarkdownDescription: "The contact's phone number in E.164 format (e.g., `+1.2125551234`). The server may normalize the value (e.g., reformat punctuation); the canonical form returned by the API is what's stored in state.",
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.RequiresReplace(),
-					stringplanmodifier.UseStateForUnknown(),
-				},
+				MarkdownDescription: "The contact's phone number in E.164 format (e.g., `+1.2125551234`). The server may normalize the value (e.g., reformat punctuation); semantic equality is used so reformatted values that canonicalise to the same digits do not trigger drift.",
+				PlanModifiers:       requiresReplace,
 			},
 			"fax": schema.StringAttribute{
+				CustomType:          phoneType{},
 				Optional:            true,
-				Computed:            true,
-				MarkdownDescription: "The contact's fax number in E.164 format. The server may normalize the value; the canonical form returned by the API is what's stored in state.",
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.RequiresReplace(),
-					stringplanmodifier.UseStateForUnknown(),
-				},
+				MarkdownDescription: "The contact's fax number in E.164 format. The server may normalize the value; semantic equality is used so reformatted values do not trigger drift.",
+				PlanModifiers:       requiresReplace,
 			},
 			"street": schema.StringAttribute{
 				Required:            true,
@@ -270,7 +264,7 @@ func populateContactModel(data *ContactResourceModel, c *models.Contact) {
 	data.FirstName = types.StringValue(c.FirstName)
 	data.LastName = types.StringValue(c.LastName)
 	data.Email = types.StringValue(c.Email)
-	data.Phone = types.StringValue(c.Phone)
+	data.Phone = phoneValue{StringValue: types.StringValue(c.Phone)}
 	data.Street = types.StringValue(c.Street)
 	data.City = types.StringValue(c.City)
 	data.PostalCode = types.StringValue(c.PostalCode)
@@ -288,9 +282,9 @@ func populateContactModel(data *ContactResourceModel, c *models.Contact) {
 		data.Title = types.StringNull()
 	}
 	if c.Fax != nil {
-		data.Fax = types.StringValue(*c.Fax)
+		data.Fax = phoneValue{StringValue: types.StringValue(*c.Fax)}
 	} else {
-		data.Fax = types.StringNull()
+		data.Fax = phoneValue{StringValue: types.StringNull()}
 	}
 	if c.State != nil {
 		data.State = types.StringValue(*c.State)
