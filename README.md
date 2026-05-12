@@ -32,18 +32,19 @@ See [`examples/provider/provider.tf`](examples/provider/provider.tf) for both au
 
 ### Provider Configuration
 
-The provider authenticates via the OpusDNS `/v1/auth` OAuth2 endpoints. Two modes are supported, with `client_secret` taking precedence:
+The provider authenticates via the OpusDNS `/v1/auth` OAuth2 endpoints. Three modes are supported, selected in this priority order:
 
-1. **Pre-minted client credentials (preferred):** supply `org_id` + `client_secret`. The provider runs only the final `/v1/auth/token` (`grant_type=client_credentials`) exchange.
-2. **User password grant (fallback):** supply `username` + `password` + `org_id`. The provider runs the full 3-step flow (password grant → mint API key → client_credentials grant). A new API key is minted on every `terraform` invocation.
+1. **Pre-minted client credentials (preferred for automation):** supply `org_id` + `client_secret`. The provider runs only the final `/v1/auth/token` (`grant_type=client_credentials`) exchange.
+2. **Full 3-step bootstrap:** supply `username` + `password` + `org_id`. The provider runs the full flow (password grant → mint API key → client_credentials grant). A new API key is minted on every `terraform` invocation.
+3. **User-token (single-step):** supply `username` + `password` only (omit `org_id` and `client_secret`). The provider performs the single `/v1/auth/token` (`grant_type=password`) call and uses the returned user access_token directly as the `Authorization: Bearer` token. The org is taken from the JWT `oid` claim. Use this for endpoints that accept either a user token or `client_id`+`client_secret`.
 
 | Attribute       | Type   | Required             | Env var                 | Description |
 |-----------------|--------|----------------------|-------------------------|-------------|
-| `org_id`        | string | Yes                  | `OPUSDNS_ORG_ID`        | Organization id (used as `client_id`), e.g. `organization_...`. |
+| `org_id`        | string | Modes 1, 2           | `OPUSDNS_ORG_ID`        | Organization id (used as `client_id`), e.g. `organization_...`. Omit for mode 3. |
 | `client_secret` | string | Mode 1               | `OPUSDNS_CLIENT_SECRET` | Pre-minted client_secret from `/v1/auth/client_credentials`. |
 | `api_key`       | string | No                   | `OPUSDNS_API_KEY`       | Pre-minted api_key (companion to client_secret; not required for the grant). |
-| `username`      | string | Mode 2               | `OPUSDNS_USERNAME`      | OpusDNS username for the password grant. |
-| `password`      | string | Mode 2               | `OPUSDNS_PASSWORD`      | OpusDNS password for the password grant. |
+| `username`      | string | Modes 2, 3           | `OPUSDNS_USERNAME`      | OpusDNS username for the password grant. |
+| `password`      | string | Modes 2, 3           | `OPUSDNS_PASSWORD`      | OpusDNS password for the password grant. |
 | `api_endpoint`  | string | No                   | `OPUSDNS_API_ENDPOINT`  | Override the API endpoint (defaults to `https://api.opusdns.com`). |
 
 ## Resources

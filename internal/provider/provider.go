@@ -28,19 +28,25 @@ type OpusDNSProvider struct {
 
 // OpusDNSProviderModel describes the provider data model.
 //
-// Authentication follows the OAuth2 flow described in
-// api/dev-resources/neovim-api-requests/api-key-connect-test.http.
+// Authentication follows the OAuth2 flows described in
+// api/dev-resources/neovim-api-requests/{auth-login,api-key-connect-test}.http.
 //
-// Two credential modes are supported, with `client_secret` taking precedence:
+// Three credential modes are supported, selected in this priority order:
 //
-//  1. Pre-minted client credentials (preferred for automation): supply
-//     `org_id` + `client_secret` (and optionally `api_key` for logging). The
-//     provider performs only the final /v1/auth/token client_credentials
-//     exchange to obtain a bearer access token.
-//  2. User password grant: supply `username` + `password` + `org_id`. The
-//     provider runs the full 3-step flow (password grant -> mint
-//     api_key/client_secret -> client_credentials grant). A new API key is
-//     minted on every Configure call.
+//  1. Pre-minted client credentials: supply `org_id` + `client_secret` (and
+//     optionally `api_key` for logging). The provider performs only the final
+//     /v1/auth/token client_credentials exchange to obtain a bearer access
+//     token. Best for automation.
+//  2. Full 3-step bootstrap: supply `username` + `password` + `org_id`. The
+//     provider runs password grant -> mint api_key/client_secret ->
+//     client_credentials grant. A new API key is minted on every Configure
+//     call.
+//  3. User-token: supply `username` + `password` only (no `org_id`,
+//     no `client_secret`). The provider performs the single-step password
+//     grant and uses the resulting user access_token directly as the bearer
+//     token. The token is already scoped to the user's organization via the
+//     JWT `oid` claim. Suitable for endpoints that accept either a user token
+//     or client_id+client_secret.
 type OpusDNSProviderModel struct {
 	Username     types.String `tfsdk:"username"`
 	Password     types.String `tfsdk:"password"`
@@ -67,9 +73,10 @@ func (p *OpusDNSProvider) Metadata(_ context.Context, _ provider.MetadataRequest
 func (p *OpusDNSProvider) Schema(_ context.Context, _ provider.SchemaRequest, resp *provider.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		MarkdownDescription: "The OpusDNS provider manages DNS zones, records, contacts, email forwards, and domain forwards via the OpusDNS API. " +
-			"Authentication is performed via the `/v1/auth` OAuth2 endpoints. Two modes are supported (in priority order): " +
-			"(1) supply pre-minted `client_secret` (with `org_id`) to skip directly to the client_credentials grant; " +
-			"(2) supply `username` + `password` (with `org_id`) to run the full password \u2192 mint \u2192 client_credentials flow.",
+			"Authentication is performed via the `/v1/auth` OAuth2 endpoints. Three modes are supported (in priority order): " +
+			"(1) supply `client_secret` (with `org_id`) to skip directly to the client_credentials grant; " +
+			"(2) supply `username` + `password` + `org_id` to run the full password \u2192 mint \u2192 client_credentials flow; " +
+			"(3) supply `username` + `password` (without `org_id`) to use the user access_token from the password grant directly as the bearer token.",
 		Attributes: map[string]schema.Attribute{
 			"username": schema.StringAttribute{
 				MarkdownDescription: "OpusDNS user username for the password grant. Ignored when `client_secret` is set. Can also be set via the `OPUSDNS_USERNAME` environment variable.",
@@ -81,7 +88,7 @@ func (p *OpusDNSProvider) Schema(_ context.Context, _ provider.SchemaRequest, re
 				Sensitive:           true,
 			},
 			"org_id": schema.StringAttribute{
-				MarkdownDescription: "OpusDNS organization id (used as the `client_id` in the client_credentials grant, e.g. `organization_...`). Required. Can also be set via the `OPUSDNS_ORG_ID` environment variable.",
+				MarkdownDescription: "OpusDNS organization id (used as the `client_id` in the client_credentials grant, e.g. `organization_...`). Required when authenticating via `client_secret` or the full 3-step password flow. Omit to use the single-step user-token flow (the user's org is taken from the JWT `oid` claim). Can also be set via the `OPUSDNS_ORG_ID` environment variable.",
 				Optional:            true,
 			},
 			"api_key": schema.StringAttribute{
@@ -117,16 +124,8 @@ func (p *OpusDNSProvider) Configure(ctx context.Context, req provider.ConfigureR
 	_ = firstNonEmpty(stringValue(data.APIKey), os.Getenv("OPUSDNS_API_KEY"))
 	endpoint := firstNonEmpty(stringValue(data.APIEndpoint), os.Getenv("OPUSDNS_API_ENDPOINT"), opusdns.DefaultAPIEndpoint)
 
-	// org_id is required for both auth modes (it's the client_id in the
-	// client_credentials grant).
-	if orgID == "" {
-		resp.Diagnostics.AddError(
-			"Missing OpusDNS Credentials",
-			"`org_id` (or the OPUSDNS_ORG_ID environment variable) is required.",
-		)
-		return
-	}
-
+	// org_id is required only for client_credentials-based modes; the
+	// single-step user-token flow derives the org from the JWT.
 	auth := &authClient{
 		endpoint: endpoint,
 		http:     &http.Client{Timeout: 30 * time.Second},
@@ -140,7 +139,15 @@ func (p *OpusDNSProvider) Configure(ctx context.Context, req provider.ConfigureR
 	switch {
 	case clientSecret != "":
 		// Preferred path: skip user login and api_key minting; go straight to
-		// the client_credentials grant with the pre-minted secret.
+		// the client_credentials grant with the pre-minted secret. Requires
+		// org_id as the client_id.
+		if orgID == "" {
+			resp.Diagnostics.AddError(
+				"Missing OpusDNS Credentials",
+				"`org_id` (or OPUSDNS_ORG_ID) is required when authenticating with `client_secret`.",
+			)
+			return
+		}
 		accessToken, err = auth.clientCredentialsGrant(ctx, orgID, clientSecret)
 		if err != nil {
 			resp.Diagnostics.AddError(
@@ -150,9 +157,8 @@ func (p *OpusDNSProvider) Configure(ctx context.Context, req provider.ConfigureR
 			return
 		}
 
-	case username != "" && password != "":
-		// Fallback path: full 3-step flow. A new API key is minted on every
-		// Configure call.
+	case username != "" && password != "" && orgID != "":
+		// Full 3-step flow. A new API key is minted on every Configure call.
 		apiKeyName := fmt.Sprintf("terraform-provider-opusdns-%s-%d", p.version, time.Now().UnixNano())
 		accessToken, _, _, err = auth.login(ctx, username, password, orgID, apiKeyName, "Auto-generated by terraform-provider-opusdns")
 		if err != nil {
@@ -163,11 +169,24 @@ func (p *OpusDNSProvider) Configure(ctx context.Context, req provider.ConfigureR
 			return
 		}
 
+	case username != "" && password != "":
+		// Single-step user-token flow: use the password-grant access_token
+		// directly as the bearer token. Org is implied by the JWT `oid` claim.
+		accessToken, err = auth.passwordGrant(ctx, username, password)
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"OpusDNS Authentication Failed",
+				fmt.Sprintf("password grant against %s failed: %s", endpoint, err.Error()),
+			)
+			return
+		}
+
 	default:
 		resp.Diagnostics.AddError(
 			"Missing OpusDNS Credentials",
-			"Provide either `client_secret` (preferred, with `org_id`) or `username` + `password` (with `org_id`). "+
-				"Equivalent environment variables: OPUSDNS_CLIENT_SECRET, or OPUSDNS_USERNAME + OPUSDNS_PASSWORD.",
+			"Provide one of: `client_secret` + `org_id`; or `username` + `password` + `org_id`; or `username` + `password` alone. "+
+				"Equivalent environment variables: OPUSDNS_CLIENT_SECRET + OPUSDNS_ORG_ID, "+
+				"or OPUSDNS_USERNAME + OPUSDNS_PASSWORD (+ optional OPUSDNS_ORG_ID).",
 		)
 		return
 	}
