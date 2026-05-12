@@ -98,13 +98,21 @@ func (r *ContactResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 			},
 			"phone": schema.StringAttribute{
 				Required:            true,
-				MarkdownDescription: "The contact's phone number in E.164 format (e.g., `+1.2125551234`).",
-				PlanModifiers:       requiresReplace,
+				Computed:            true,
+				MarkdownDescription: "The contact's phone number in E.164 format (e.g., `+1.2125551234`). The server may normalize the value (e.g., reformat punctuation); the canonical form returned by the API is what's stored in state.",
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.RequiresReplace(),
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"fax": schema.StringAttribute{
 				Optional:            true,
-				MarkdownDescription: "The contact's fax number in E.164 format.",
-				PlanModifiers:       requiresReplace,
+				Computed:            true,
+				MarkdownDescription: "The contact's fax number in E.164 format. The server may normalize the value; the canonical form returned by the API is what's stored in state.",
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.RequiresReplace(),
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"street": schema.StringAttribute{
 				Required:            true,
