@@ -12,14 +12,20 @@ import (
 	"time"
 )
 
-// authClient performs the 3-step OAuth login flow against the OpusDNS API
-// described in api/dev-resources/neovim-api-requests/api-key-connect-test.http:
+// authClient performs OAuth login flows against the OpusDNS API. Two
+// workflows are supported by the helpers below:
 //
-//  1. POST /v1/auth/token (grant_type=password) with username/password ->
+//   - Single-step user-token (see auth-login.http):
+//     passwordGrant() returns the user access_token directly, which can be
+//     used as `Authorization: Bearer` for endpoints that accept user tokens.
+//
+//   - Three-step client_credentials bootstrap (see api-key-connect-test.http),
+//     orchestrated by login():
+//     1. POST /v1/auth/token (grant_type=password) with username/password ->
 //     user access_token.
-//  2. POST /v1/auth/client_credentials (Bearer user token) ->
+//     2. POST /v1/auth/client_credentials (Bearer user token) ->
 //     api_key + client_secret.
-//  3. POST /v1/auth/token (grant_type=client_credentials) with
+//     3. POST /v1/auth/token (grant_type=client_credentials) with
 //     client_id=org_id, client_secret -> final api access_token.
 type authClient struct {
 	endpoint string // e.g. https://api.opusdns.com (no trailing /, no version)

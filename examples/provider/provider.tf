@@ -86,7 +86,7 @@ provider "opusdns" {
 }
 
 # ---------------------------------------------------------------------------
-# Option 2 (fallback): user password grant.
+# Option 2 (fallback): user password grant + client_credentials bootstrap.
 #
 # Supply username, password, and org_id. The provider runs the full 3-step
 # flow described in api/dev-resources/neovim-api-requests/api-key-connect-test.http:
@@ -104,5 +104,23 @@ provider "opusdns" {
 #   username     = var.opusdns_username
 #   password     = var.opusdns_password
 #   org_id       = var.opusdns_org_id
+#   api_endpoint = var.opusdns_api_endpoint
+# }
+
+# ---------------------------------------------------------------------------
+# Option 3: user-token (single-step password grant).
+#
+# Supply only username and password (omit org_id and client_secret). The
+# provider performs a single POST /v1/auth/token (grant_type=password) and
+# uses the resulting user access_token directly as the Authorization: Bearer
+# header. The user's organization is derived from the JWT `oid` claim, so
+# resources/data sources scoped to "the caller's org" work without an
+# explicit org_id. Use this for endpoints documented to accept either a
+# user token or client_id+client_secret. See
+# api/dev-resources/neovim-api-requests/auth-login.http.
+# ---------------------------------------------------------------------------
+# provider "opusdns" {
+#   username     = var.opusdns_username
+#   password     = var.opusdns_password
 #   api_endpoint = var.opusdns_api_endpoint
 # }
