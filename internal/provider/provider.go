@@ -233,6 +233,7 @@ func (p *OpusDNSProvider) Resources(_ context.Context) []func() resource.Resourc
 		NewDomainForwardResource,
 		NewOrganizationResource,
 		NewUserResource,
+		NewDomainResource,
 	}
 }
 
@@ -246,6 +247,8 @@ func (p *OpusDNSProvider) DataSources(_ context.Context) []func() datasource.Dat
 		NewUsersDataSource,
 		NewContactDataSource,
 		NewContactsDataSource,
+		NewDomainDataSource,
+		NewDomainsDataSource,
 	}
 }
 
