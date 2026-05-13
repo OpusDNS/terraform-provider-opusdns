@@ -3,6 +3,7 @@ package provider
 import (
 	"context"
 	"errors"
+	"time"
 
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/opusdns/opusdns-go-client/models"
@@ -40,6 +41,16 @@ func stringPtrToValue(p *string) types.String {
 		return types.StringNull()
 	}
 	return types.StringValue(*p)
+}
+
+// timePtrToValue converts a *time.Time (typical of SDK response types) into a
+// types.String containing an RFC3339 representation, mapping nil to
+// types.StringNull().
+func timePtrToValue(t *time.Time) types.String {
+	if t == nil {
+		return types.StringNull()
+	}
+	return types.StringValue(t.Format(time.RFC3339))
 }
 
 // rawCreateOrganization wraps POST /v1/organizations. The SDK as of v1.0.9 has
