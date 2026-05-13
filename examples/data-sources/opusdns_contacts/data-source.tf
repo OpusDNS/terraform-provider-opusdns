@@ -9,5 +9,5 @@ data "opusdns_contacts" "verified_us_smiths" {
 }
 
 output "contact_emails" {
-  value = [for c in data.opusdns_contacts.all.contacts : c.email]
+  value = [for c in data.opusdns_contacts.contact_list.contacts : c.email]
 }
