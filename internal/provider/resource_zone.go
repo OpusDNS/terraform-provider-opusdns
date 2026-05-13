@@ -96,7 +96,7 @@ func (r *ZoneResource) Create(ctx context.Context, req resource.CreateRequest, r
 
 	zone, err := r.client.DNS.CreateZone(ctx, createReq)
 	if err != nil {
-		resp.Diagnostics.AddError("Error creating DNS zone", err.Error())
+		resp.Diagnostics.AddError("Error creating DNS zone", formatAPIError(err))
 		return
 	}
 
@@ -120,7 +120,7 @@ func (r *ZoneResource) Read(ctx context.Context, req resource.ReadRequest, resp 
 			resp.State.RemoveResource(ctx)
 			return
 		}
-		resp.Diagnostics.AddError("Error reading DNS zone", err.Error())
+		resp.Diagnostics.AddError("Error reading DNS zone", formatAPIError(err))
 		return
 	}
 
@@ -146,12 +146,12 @@ func (r *ZoneResource) Update(ctx context.Context, req resource.UpdateRequest, r
 		switch plan.DNSSECStatus.ValueString() {
 		case string(models.DNSSECStatusEnabled):
 			if _, err := r.client.DNS.EnableDNSSEC(ctx, state.Name.ValueString()); err != nil {
-				resp.Diagnostics.AddError("Error enabling DNSSEC", err.Error())
+				resp.Diagnostics.AddError("Error enabling DNSSEC", formatAPIError(err))
 				return
 			}
 		case string(models.DNSSECStatusDisabled):
 			if _, err := r.client.DNS.DisableDNSSEC(ctx, state.Name.ValueString()); err != nil {
-				resp.Diagnostics.AddError("Error disabling DNSSEC", err.Error())
+				resp.Diagnostics.AddError("Error disabling DNSSEC", formatAPIError(err))
 				return
 			}
 		}
@@ -160,7 +160,7 @@ func (r *ZoneResource) Update(ctx context.Context, req resource.UpdateRequest, r
 	// Re-read current state.
 	zone, err := r.client.DNS.GetZone(ctx, state.Name.ValueString())
 	if err != nil {
-		resp.Diagnostics.AddError("Error reading DNS zone after update", err.Error())
+		resp.Diagnostics.AddError("Error reading DNS zone after update", formatAPIError(err))
 		return
 	}
 
@@ -180,7 +180,7 @@ func (r *ZoneResource) Delete(ctx context.Context, req resource.DeleteRequest, r
 
 	if err := r.client.DNS.DeleteZone(ctx, data.Name.ValueString()); err != nil {
 		if !isNotFound(err) {
-			resp.Diagnostics.AddError("Error deleting DNS zone", err.Error())
+			resp.Diagnostics.AddError("Error deleting DNS zone", formatAPIError(err))
 		}
 	}
 }
@@ -188,7 +188,7 @@ func (r *ZoneResource) Delete(ctx context.Context, req resource.DeleteRequest, r
 func (r *ZoneResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
 	zone, err := r.client.DNS.GetZone(ctx, req.ID)
 	if err != nil {
-		resp.Diagnostics.AddError("Error importing DNS zone", err.Error())
+		resp.Diagnostics.AddError("Error importing DNS zone", formatAPIError(err))
 		return
 	}
 

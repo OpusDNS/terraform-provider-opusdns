@@ -198,7 +198,7 @@ func (r *ContactResource) Create(ctx context.Context, req resource.CreateRequest
 
 	contact, err := r.client.Contacts.CreateContact(ctx, createReq)
 	if err != nil {
-		resp.Diagnostics.AddError("Error creating contact", err.Error())
+		resp.Diagnostics.AddError("Error creating contact", formatAPIError(err))
 		return
 	}
 
@@ -219,7 +219,7 @@ func (r *ContactResource) Read(ctx context.Context, req resource.ReadRequest, re
 			resp.State.RemoveResource(ctx)
 			return
 		}
-		resp.Diagnostics.AddError("Error reading contact", err.Error())
+		resp.Diagnostics.AddError("Error reading contact", formatAPIError(err))
 		return
 	}
 
@@ -240,7 +240,7 @@ func (r *ContactResource) Delete(ctx context.Context, req resource.DeleteRequest
 
 	if err := r.client.Contacts.DeleteContact(ctx, models.ContactID(data.ContactID.ValueString())); err != nil {
 		if !isNotFound(err) {
-			resp.Diagnostics.AddError("Error deleting contact", err.Error())
+			resp.Diagnostics.AddError("Error deleting contact", formatAPIError(err))
 		}
 	}
 }
@@ -248,7 +248,7 @@ func (r *ContactResource) Delete(ctx context.Context, req resource.DeleteRequest
 func (r *ContactResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
 	contact, err := r.client.Contacts.GetContact(ctx, models.ContactID(req.ID))
 	if err != nil {
-		resp.Diagnostics.AddError("Error importing contact", err.Error())
+		resp.Diagnostics.AddError("Error importing contact", formatAPIError(err))
 		return
 	}
 

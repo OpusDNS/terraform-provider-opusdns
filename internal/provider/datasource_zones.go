@@ -97,7 +97,7 @@ func (d *ZonesDataSource) Read(ctx context.Context, req datasource.ReadRequest, 
 
 	zones, err := d.client.DNS.ListZones(ctx, nil)
 	if err != nil {
-		resp.Diagnostics.AddError("Error listing DNS zones", err.Error())
+		resp.Diagnostics.AddError("Error listing DNS zones", formatAPIError(err))
 		return
 	}
 

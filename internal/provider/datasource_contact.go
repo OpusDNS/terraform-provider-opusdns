@@ -108,7 +108,7 @@ func (d *ContactDataSource) Read(ctx context.Context, req datasource.ReadRequest
 
 	contact, err := d.client.Contacts.GetContact(ctx, models.ContactID(data.ContactID.ValueString()))
 	if err != nil {
-		resp.Diagnostics.AddError("Error reading contact", err.Error())
+		resp.Diagnostics.AddError("Error reading contact", formatAPIError(err))
 		return
 	}
 

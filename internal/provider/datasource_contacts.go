@@ -146,7 +146,7 @@ func (d *ContactsDataSource) Read(ctx context.Context, req datasource.ReadReques
 
 	contacts, err := d.client.Contacts.ListContacts(ctx, opts)
 	if err != nil {
-		resp.Diagnostics.AddError("Error listing contacts", err.Error())
+		resp.Diagnostics.AddError("Error listing contacts", formatAPIError(err))
 		return
 	}
 

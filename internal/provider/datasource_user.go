@@ -105,7 +105,7 @@ func (d *UserDataSource) Read(ctx context.Context, req datasource.ReadRequest, r
 		return
 	}
 	if err != nil {
-		resp.Diagnostics.AddError("Error reading user", err.Error())
+		resp.Diagnostics.AddError("Error reading user", formatAPIError(err))
 		return
 	}
 

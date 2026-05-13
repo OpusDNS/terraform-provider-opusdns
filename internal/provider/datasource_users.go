@@ -93,7 +93,7 @@ func (d *UsersDataSource) Read(ctx context.Context, req datasource.ReadRequest, 
 
 	users, err := d.client.Users.ListUsers(ctx, nil)
 	if err != nil {
-		resp.Diagnostics.AddError("Error listing users", err.Error())
+		resp.Diagnostics.AddError("Error listing users", formatAPIError(err))
 		return
 	}
 

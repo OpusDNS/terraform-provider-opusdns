@@ -2,7 +2,10 @@ package provider
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"fmt"
+	"strings"
 	"time"
 
 	"github.com/hashicorp/terraform-plugin-framework/types"
@@ -51,6 +54,34 @@ func timePtrToValue(t *time.Time) types.String {
 		return types.StringNull()
 	}
 	return types.StringValue(t.Format(time.RFC3339))
+}
+
+// formatAPIError returns a multi-line string describing err with as much
+// detail as the SDK exposes. For *opusdns.APIError values it surfaces the
+// status code, error code, message, request id, the raw response body, and
+// any structured `details` map. For other errors it returns err.Error().
+func formatAPIError(err error) string {
+	var apiErr *opusdns.APIError
+	if !errors.As(err, &apiErr) {
+		return err.Error()
+	}
+
+	var b strings.Builder
+	fmt.Fprintf(&b, "%s", apiErr.Error())
+	if apiErr.RequestID != "" {
+		fmt.Fprintf(&b, "\nrequest_id: %s", apiErr.RequestID)
+	}
+	if len(apiErr.Details) > 0 {
+		if data, mErr := json.MarshalIndent(apiErr.Details, "", "  "); mErr == nil {
+			fmt.Fprintf(&b, "\ndetails:\n%s", data)
+		} else {
+			fmt.Fprintf(&b, "\ndetails: %+v", apiErr.Details)
+		}
+	}
+	if apiErr.RawBody != "" {
+		fmt.Fprintf(&b, "\nresponse body:\n%s", strings.TrimSpace(apiErr.RawBody))
+	}
+	return b.String()
 }
 
 // rawCreateOrganization wraps POST /v1/organizations. The SDK as of v1.0.9 has
