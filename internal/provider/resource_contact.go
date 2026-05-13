@@ -33,8 +33,8 @@ type ContactResourceModel struct {
 	Org        types.String `tfsdk:"org"`
 	Title      types.String `tfsdk:"title"`
 	Email      types.String `tfsdk:"email"`
-	Phone      types.String `tfsdk:"phone"`
-	Fax        types.String `tfsdk:"fax"`
+	Phone      phoneValue   `tfsdk:"phone"`
+	Fax        phoneValue   `tfsdk:"fax"`
 	Street     types.String `tfsdk:"street"`
 	City       types.String `tfsdk:"city"`
 	State      types.String `tfsdk:"state"`
@@ -97,13 +97,15 @@ func (r *ContactResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 				PlanModifiers:       requiresReplace,
 			},
 			"phone": schema.StringAttribute{
+				CustomType:          phoneType{},
 				Required:            true,
-				MarkdownDescription: "The contact's phone number in E.164 format (e.g., `+1.2125551234`).",
+				MarkdownDescription: "The contact's phone number in E.164 format (e.g., `+1.2125551234`). The server may normalize the value (e.g., reformat punctuation); semantic equality is used so reformatted values that canonicalise to the same digits do not trigger drift.",
 				PlanModifiers:       requiresReplace,
 			},
 			"fax": schema.StringAttribute{
+				CustomType:          phoneType{},
 				Optional:            true,
-				MarkdownDescription: "The contact's fax number in E.164 format.",
+				MarkdownDescription: "The contact's fax number in E.164 format. The server may normalize the value; semantic equality is used so reformatted values do not trigger drift.",
 				PlanModifiers:       requiresReplace,
 			},
 			"street": schema.StringAttribute{
@@ -196,7 +198,7 @@ func (r *ContactResource) Create(ctx context.Context, req resource.CreateRequest
 
 	contact, err := r.client.Contacts.CreateContact(ctx, createReq)
 	if err != nil {
-		resp.Diagnostics.AddError("Error creating contact", err.Error())
+		resp.Diagnostics.AddError("Error creating contact", formatAPIError(err))
 		return
 	}
 
@@ -217,7 +219,7 @@ func (r *ContactResource) Read(ctx context.Context, req resource.ReadRequest, re
 			resp.State.RemoveResource(ctx)
 			return
 		}
-		resp.Diagnostics.AddError("Error reading contact", err.Error())
+		resp.Diagnostics.AddError("Error reading contact", formatAPIError(err))
 		return
 	}
 
@@ -238,7 +240,7 @@ func (r *ContactResource) Delete(ctx context.Context, req resource.DeleteRequest
 
 	if err := r.client.Contacts.DeleteContact(ctx, models.ContactID(data.ContactID.ValueString())); err != nil {
 		if !isNotFound(err) {
-			resp.Diagnostics.AddError("Error deleting contact", err.Error())
+			resp.Diagnostics.AddError("Error deleting contact", formatAPIError(err))
 		}
 	}
 }
@@ -246,7 +248,7 @@ func (r *ContactResource) Delete(ctx context.Context, req resource.DeleteRequest
 func (r *ContactResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
 	contact, err := r.client.Contacts.GetContact(ctx, models.ContactID(req.ID))
 	if err != nil {
-		resp.Diagnostics.AddError("Error importing contact", err.Error())
+		resp.Diagnostics.AddError("Error importing contact", formatAPIError(err))
 		return
 	}
 
@@ -262,7 +264,7 @@ func populateContactModel(data *ContactResourceModel, c *models.Contact) {
 	data.FirstName = types.StringValue(c.FirstName)
 	data.LastName = types.StringValue(c.LastName)
 	data.Email = types.StringValue(c.Email)
-	data.Phone = types.StringValue(c.Phone)
+	data.Phone = phoneValue{StringValue: types.StringValue(c.Phone)}
 	data.Street = types.StringValue(c.Street)
 	data.City = types.StringValue(c.City)
 	data.PostalCode = types.StringValue(c.PostalCode)
@@ -280,9 +282,9 @@ func populateContactModel(data *ContactResourceModel, c *models.Contact) {
 		data.Title = types.StringNull()
 	}
 	if c.Fax != nil {
-		data.Fax = types.StringValue(*c.Fax)
+		data.Fax = phoneValue{StringValue: types.StringValue(*c.Fax)}
 	} else {
-		data.Fax = types.StringNull()
+		data.Fax = phoneValue{StringValue: types.StringNull()}
 	}
 	if c.State != nil {
 		data.State = types.StringValue(*c.State)

@@ -123,7 +123,7 @@ func (r *RecordResource) Create(ctx context.Context, req resource.CreateRequest,
 		{Op: models.RecordOpUpsert, RRSet: rrset},
 	})
 	if err != nil {
-		resp.Diagnostics.AddError("Error creating DNS record", err.Error())
+		resp.Diagnostics.AddError("Error creating DNS record", formatAPIError(err))
 		return
 	}
 
@@ -144,7 +144,7 @@ func (r *RecordResource) Read(ctx context.Context, req resource.ReadRequest, res
 			resp.State.RemoveResource(ctx)
 			return
 		}
-		resp.Diagnostics.AddError("Error reading DNS zone", err.Error())
+		resp.Diagnostics.AddError("Error reading DNS zone", formatAPIError(err))
 		return
 	}
 
@@ -188,7 +188,7 @@ func (r *RecordResource) Update(ctx context.Context, req resource.UpdateRequest,
 		{Op: models.RecordOpUpsert, RRSet: rrset},
 	})
 	if err != nil {
-		resp.Diagnostics.AddError("Error updating DNS record", err.Error())
+		resp.Diagnostics.AddError("Error updating DNS record", formatAPIError(err))
 		return
 	}
 
@@ -214,7 +214,7 @@ func (r *RecordResource) Delete(ctx context.Context, req resource.DeleteRequest,
 	})
 	if err != nil {
 		if !isNotFound(err) {
-			resp.Diagnostics.AddError("Error deleting DNS record", err.Error())
+			resp.Diagnostics.AddError("Error deleting DNS record", formatAPIError(err))
 		}
 	}
 }
@@ -234,7 +234,7 @@ func (r *RecordResource) ImportState(ctx context.Context, req resource.ImportSta
 
 	zone, err := r.client.DNS.GetZone(ctx, zoneName)
 	if err != nil {
-		resp.Diagnostics.AddError("Error reading DNS zone during import", err.Error())
+		resp.Diagnostics.AddError("Error reading DNS zone during import", formatAPIError(err))
 		return
 	}
 

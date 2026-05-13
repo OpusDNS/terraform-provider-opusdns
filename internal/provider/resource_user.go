@@ -154,7 +154,7 @@ func (r *UserResource) Create(ctx context.Context, req resource.CreateRequest, r
 
 	user, err := r.client.Users.CreateUser(ctx, createReq)
 	if err != nil {
-		resp.Diagnostics.AddError("Error creating user", err.Error())
+		resp.Diagnostics.AddError("Error creating user", formatAPIError(err))
 		return
 	}
 
@@ -175,7 +175,7 @@ func (r *UserResource) Read(ctx context.Context, req resource.ReadRequest, resp 
 			resp.State.RemoveResource(ctx)
 			return
 		}
-		resp.Diagnostics.AddError("Error reading user", err.Error())
+		resp.Diagnostics.AddError("Error reading user", formatAPIError(err))
 		return
 	}
 
@@ -199,7 +199,7 @@ func (r *UserResource) Update(ctx context.Context, req resource.UpdateRequest, r
 
 	user, err := r.client.Users.UpdateUser(ctx, models.UserID(plan.UserID.ValueString()), updateReq)
 	if err != nil {
-		resp.Diagnostics.AddError("Error updating user", err.Error())
+		resp.Diagnostics.AddError("Error updating user", formatAPIError(err))
 		return
 	}
 
@@ -216,7 +216,7 @@ func (r *UserResource) Delete(ctx context.Context, req resource.DeleteRequest, r
 
 	if err := r.client.Users.DeleteUser(ctx, models.UserID(data.UserID.ValueString())); err != nil {
 		if !isNotFound(err) {
-			resp.Diagnostics.AddError("Error deleting user", err.Error())
+			resp.Diagnostics.AddError("Error deleting user", formatAPIError(err))
 		}
 	}
 }

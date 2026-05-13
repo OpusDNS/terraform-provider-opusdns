@@ -78,7 +78,7 @@ func (d *ZoneDataSource) Read(ctx context.Context, req datasource.ReadRequest, r
 
 	zone, err := d.client.DNS.GetZone(ctx, data.Name.ValueString())
 	if err != nil {
-		resp.Diagnostics.AddError("Error reading DNS zone", err.Error())
+		resp.Diagnostics.AddError("Error reading DNS zone", formatAPIError(err))
 		return
 	}
 

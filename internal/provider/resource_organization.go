@@ -208,7 +208,7 @@ func (r *OrganizationResource) Create(ctx context.Context, req resource.CreateRe
 
 	org, err := rawCreateOrganization(ctx, r.client, body)
 	if err != nil {
-		resp.Diagnostics.AddError("Error creating organization", err.Error())
+		resp.Diagnostics.AddError("Error creating organization", formatAPIError(err))
 		return
 	}
 
@@ -229,7 +229,7 @@ func (r *OrganizationResource) Read(ctx context.Context, req resource.ReadReques
 			resp.State.RemoveResource(ctx)
 			return
 		}
-		resp.Diagnostics.AddError("Error reading organization", err.Error())
+		resp.Diagnostics.AddError("Error reading organization", formatAPIError(err))
 		return
 	}
 
@@ -263,7 +263,7 @@ func (r *OrganizationResource) Update(ctx context.Context, req resource.UpdateRe
 
 	org, err := r.client.Organizations.UpdateOrganization(ctx, models.OrganizationID(plan.OrganizationID.ValueString()), updateReq)
 	if err != nil {
-		resp.Diagnostics.AddError("Error updating organization", err.Error())
+		resp.Diagnostics.AddError("Error updating organization", formatAPIError(err))
 		return
 	}
 
@@ -280,7 +280,7 @@ func (r *OrganizationResource) Delete(ctx context.Context, req resource.DeleteRe
 
 	if err := rawDeleteOrganization(ctx, r.client, models.OrganizationID(data.OrganizationID.ValueString())); err != nil {
 		if !isNotFound(err) {
-			resp.Diagnostics.AddError("Error deleting organization", err.Error())
+			resp.Diagnostics.AddError("Error deleting organization", formatAPIError(err))
 		}
 	}
 }

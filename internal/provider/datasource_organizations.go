@@ -91,7 +91,7 @@ func (d *OrganizationsDataSource) Read(ctx context.Context, req datasource.ReadR
 
 	orgs, err := d.client.Organizations.ListOrganizations(ctx, nil)
 	if err != nil {
-		resp.Diagnostics.AddError("Error listing organizations", err.Error())
+		resp.Diagnostics.AddError("Error listing organizations", formatAPIError(err))
 		return
 	}
 

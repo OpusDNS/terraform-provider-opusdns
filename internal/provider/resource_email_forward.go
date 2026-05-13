@@ -154,20 +154,20 @@ func (r *EmailForwardResource) Create(ctx context.Context, req resource.CreateRe
 
 	ef, err := r.client.EmailForwards.CreateEmailForward(ctx, createReq)
 	if err != nil {
-		resp.Diagnostics.AddError("Error creating email forward", err.Error())
+		resp.Diagnostics.AddError("Error creating email forward", formatAPIError(err))
 		return
 	}
 
 	if !data.Enabled.ValueBool() {
 		if err := r.client.EmailForwards.DisableEmailForward(ctx, ef.EmailForwardID); err != nil {
-			resp.Diagnostics.AddError("Error disabling email forward", err.Error())
+			resp.Diagnostics.AddError("Error disabling email forward", formatAPIError(err))
 			return
 		}
 	}
 
 	ef, err = r.client.EmailForwards.GetEmailForward(ctx, ef.EmailForwardID)
 	if err != nil {
-		resp.Diagnostics.AddError("Error reading email forward after create", err.Error())
+		resp.Diagnostics.AddError("Error reading email forward after create", formatAPIError(err))
 		return
 	}
 
@@ -190,7 +190,7 @@ func (r *EmailForwardResource) Read(ctx context.Context, req resource.ReadReques
 			resp.State.RemoveResource(ctx)
 			return
 		}
-		resp.Diagnostics.AddError("Error reading email forward", err.Error())
+		resp.Diagnostics.AddError("Error reading email forward", formatAPIError(err))
 		return
 	}
 
@@ -213,12 +213,12 @@ func (r *EmailForwardResource) Update(ctx context.Context, req resource.UpdateRe
 	if plan.Enabled.ValueBool() != state.Enabled.ValueBool() {
 		if plan.Enabled.ValueBool() {
 			if err := r.client.EmailForwards.EnableEmailForward(ctx, efID); err != nil {
-				resp.Diagnostics.AddError("Error enabling email forward", err.Error())
+				resp.Diagnostics.AddError("Error enabling email forward", formatAPIError(err))
 				return
 			}
 		} else {
 			if err := r.client.EmailForwards.DisableEmailForward(ctx, efID); err != nil {
-				resp.Diagnostics.AddError("Error disabling email forward", err.Error())
+				resp.Diagnostics.AddError("Error disabling email forward", formatAPIError(err))
 				return
 			}
 		}
@@ -248,7 +248,7 @@ func (r *EmailForwardResource) Update(ctx context.Context, req resource.UpdateRe
 		if _, exists := planAliasMap[aliasName]; !exists {
 			aliasID := models.EmailForwardAliasID(stateAlias.AliasID.ValueString())
 			if err := r.client.EmailForwards.DeleteAlias(ctx, efID, aliasID); err != nil && !isNotFound(err) {
-				resp.Diagnostics.AddError("Error deleting email alias", err.Error())
+				resp.Diagnostics.AddError("Error deleting email alias", formatAPIError(err))
 				return
 			}
 		}
@@ -264,7 +264,7 @@ func (r *EmailForwardResource) Update(ctx context.Context, req resource.UpdateRe
 			aliasID := models.EmailForwardAliasID(existing.AliasID.ValueString())
 			if _, err := r.client.EmailForwards.UpdateAlias(ctx, efID, aliasID,
 				&models.EmailForwardAliasUpdate{ForwardTo: forwardTo}); err != nil {
-				resp.Diagnostics.AddError("Error updating email alias", err.Error())
+				resp.Diagnostics.AddError("Error updating email alias", formatAPIError(err))
 				return
 			}
 		} else {
@@ -272,7 +272,7 @@ func (r *EmailForwardResource) Update(ctx context.Context, req resource.UpdateRe
 				Alias:     aliasName,
 				ForwardTo: forwardTo,
 			}); err != nil {
-				resp.Diagnostics.AddError("Error creating email alias", err.Error())
+				resp.Diagnostics.AddError("Error creating email alias", formatAPIError(err))
 				return
 			}
 		}
@@ -280,7 +280,7 @@ func (r *EmailForwardResource) Update(ctx context.Context, req resource.UpdateRe
 
 	ef, err := r.client.EmailForwards.GetEmailForward(ctx, efID)
 	if err != nil {
-		resp.Diagnostics.AddError("Error reading email forward after update", err.Error())
+		resp.Diagnostics.AddError("Error reading email forward after update", formatAPIError(err))
 		return
 	}
 
@@ -298,7 +298,7 @@ func (r *EmailForwardResource) Delete(ctx context.Context, req resource.DeleteRe
 	}
 	if err := r.client.EmailForwards.DeleteEmailForward(ctx, models.EmailForwardID(data.EmailForwardID.ValueString())); err != nil {
 		if !isNotFound(err) {
-			resp.Diagnostics.AddError("Error deleting email forward", err.Error())
+			resp.Diagnostics.AddError("Error deleting email forward", formatAPIError(err))
 		}
 	}
 }
@@ -306,7 +306,7 @@ func (r *EmailForwardResource) Delete(ctx context.Context, req resource.DeleteRe
 func (r *EmailForwardResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
 	ef, err := r.client.EmailForwards.GetEmailForward(ctx, models.EmailForwardID(req.ID))
 	if err != nil {
-		resp.Diagnostics.AddError("Error importing email forward", err.Error())
+		resp.Diagnostics.AddError("Error importing email forward", formatAPIError(err))
 		return
 	}
 	var data EmailForwardResourceModel

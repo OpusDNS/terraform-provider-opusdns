@@ -165,7 +165,7 @@ func (r *DomainForwardResource) Create(ctx context.Context, req resource.CreateR
 
 	df, err := r.client.DomainForwards.CreateDomainForward(ctx, createReq)
 	if err != nil {
-		resp.Diagnostics.AddError("Error creating domain forward", err.Error())
+		resp.Diagnostics.AddError("Error creating domain forward", formatAPIError(err))
 		return
 	}
 
@@ -188,7 +188,7 @@ func (r *DomainForwardResource) Read(ctx context.Context, req resource.ReadReque
 			resp.State.RemoveResource(ctx)
 			return
 		}
-		resp.Diagnostics.AddError("Error reading domain forward", err.Error())
+		resp.Diagnostics.AddError("Error reading domain forward", formatAPIError(err))
 		return
 	}
 
@@ -211,12 +211,12 @@ func (r *DomainForwardResource) Update(ctx context.Context, req resource.UpdateR
 	if plan.Enabled.ValueBool() != state.Enabled.ValueBool() {
 		if plan.Enabled.ValueBool() {
 			if err := r.client.DomainForwards.EnableDomainForward(ctx, hostname); err != nil {
-				resp.Diagnostics.AddError("Error enabling domain forward", err.Error())
+				resp.Diagnostics.AddError("Error enabling domain forward", formatAPIError(err))
 				return
 			}
 		} else {
 			if err := r.client.DomainForwards.DisableDomainForward(ctx, hostname); err != nil {
-				resp.Diagnostics.AddError("Error disabling domain forward", err.Error())
+				resp.Diagnostics.AddError("Error disabling domain forward", formatAPIError(err))
 				return
 			}
 		}
@@ -231,13 +231,13 @@ func (r *DomainForwardResource) Update(ctx context.Context, req resource.UpdateR
 		}
 		if httpSet != nil {
 			if _, err := r.client.DomainForwards.UpdateDomainForwardConfig(ctx, hostname, models.HttpProtocolHTTP, httpSet); err != nil {
-				resp.Diagnostics.AddError("Error updating HTTP domain forward config", err.Error())
+				resp.Diagnostics.AddError("Error updating HTTP domain forward config", formatAPIError(err))
 				return
 			}
 		} else {
 			// Delete HTTP config if removed.
 			if err := r.client.DomainForwards.DeleteDomainForwardConfig(ctx, hostname, models.HttpProtocolHTTP); err != nil && !isNotFound(err) {
-				resp.Diagnostics.AddError("Error deleting HTTP domain forward config", err.Error())
+				resp.Diagnostics.AddError("Error deleting HTTP domain forward config", formatAPIError(err))
 				return
 			}
 		}
@@ -252,12 +252,12 @@ func (r *DomainForwardResource) Update(ctx context.Context, req resource.UpdateR
 		}
 		if httpsSet != nil {
 			if _, err := r.client.DomainForwards.UpdateDomainForwardConfig(ctx, hostname, models.HttpProtocolHTTPS, httpsSet); err != nil {
-				resp.Diagnostics.AddError("Error updating HTTPS domain forward config", err.Error())
+				resp.Diagnostics.AddError("Error updating HTTPS domain forward config", formatAPIError(err))
 				return
 			}
 		} else {
 			if err := r.client.DomainForwards.DeleteDomainForwardConfig(ctx, hostname, models.HttpProtocolHTTPS); err != nil && !isNotFound(err) {
-				resp.Diagnostics.AddError("Error deleting HTTPS domain forward config", err.Error())
+				resp.Diagnostics.AddError("Error deleting HTTPS domain forward config", formatAPIError(err))
 				return
 			}
 		}
@@ -265,7 +265,7 @@ func (r *DomainForwardResource) Update(ctx context.Context, req resource.UpdateR
 
 	df, err := r.client.DomainForwards.GetDomainForward(ctx, hostname)
 	if err != nil {
-		resp.Diagnostics.AddError("Error reading domain forward after update", err.Error())
+		resp.Diagnostics.AddError("Error reading domain forward after update", formatAPIError(err))
 		return
 	}
 
@@ -283,7 +283,7 @@ func (r *DomainForwardResource) Delete(ctx context.Context, req resource.DeleteR
 	}
 	if err := r.client.DomainForwards.DeleteDomainForward(ctx, data.Hostname.ValueString()); err != nil {
 		if !isNotFound(err) {
-			resp.Diagnostics.AddError("Error deleting domain forward", err.Error())
+			resp.Diagnostics.AddError("Error deleting domain forward", formatAPIError(err))
 		}
 	}
 }
@@ -291,7 +291,7 @@ func (r *DomainForwardResource) Delete(ctx context.Context, req resource.DeleteR
 func (r *DomainForwardResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
 	df, err := r.client.DomainForwards.GetDomainForward(ctx, req.ID)
 	if err != nil {
-		resp.Diagnostics.AddError("Error importing domain forward", err.Error())
+		resp.Diagnostics.AddError("Error importing domain forward", formatAPIError(err))
 		return
 	}
 	var data DomainForwardResourceModel

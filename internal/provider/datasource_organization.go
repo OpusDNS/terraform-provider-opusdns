@@ -110,7 +110,7 @@ func (d *OrganizationDataSource) Read(ctx context.Context, req datasource.ReadRe
 	case data.Me.ValueBool():
 		user, err := d.client.Users.GetCurrentUser(ctx)
 		if err != nil {
-			resp.Diagnostics.AddError("Error resolving current user", err.Error())
+			resp.Diagnostics.AddError("Error resolving current user", formatAPIError(err))
 			return
 		}
 		orgID = user.OrganizationID
@@ -126,7 +126,7 @@ func (d *OrganizationDataSource) Read(ctx context.Context, req datasource.ReadRe
 
 	org, err := d.client.Organizations.GetOrganization(ctx, orgID)
 	if err != nil {
-		resp.Diagnostics.AddError("Error reading organization", err.Error())
+		resp.Diagnostics.AddError("Error reading organization", formatAPIError(err))
 		return
 	}
 
