@@ -72,6 +72,42 @@ func stringSlicesEqual(a, b []string) bool {
 	return true
 }
 
+// fqdnRDataTypes is the set of DNS record types whose rdata wire form
+// is, or ends in, a fully-qualified domain name. The OpusDNS API returns
+// these in trailing-dot form (e.g. `target.example.com.`) while users
+// typically write the dot-less form in their Terraform config. Stripping
+// the trailing dot on the way into state keeps plan-vs-state diffs and
+// post-apply consistency checks aligned.
+//
+// For MX and SRV the rdata is a space-separated tuple whose last token
+// is the hostname; we strip only that token's trailing dot.
+var fqdnRDataTypes = map[string]bool{
+	"CNAME": true,
+	"DNAME": true,
+	"MX":    true,
+	"NS":    true,
+	"PTR":   true,
+	"SRV":   true,
+}
+
+// normalizeRData strips a trailing `.` from FQDN-bearing record rdata so
+// values returned by the API compare equal to dot-less values supplied
+// by users. Types not listed in fqdnRDataTypes are returned unchanged.
+// For composite types (MX, SRV) only the trailing dot of the final
+// whitespace-separated token (the hostname) is removed.
+func normalizeRData(rrsetType, rdata string) string {
+	if !fqdnRDataTypes[rrsetType] {
+		return rdata
+	}
+	idx := strings.LastIndexAny(rdata, " \t")
+	if idx < 0 {
+		return strings.TrimSuffix(rdata, ".")
+	}
+	prefix := rdata[:idx+1]
+	host := rdata[idx+1:]
+	return prefix + strings.TrimSuffix(host, ".")
+}
+
 // timePtrToValue converts a *time.Time (typical of SDK response types) into a
 // types.String containing an RFC3339 representation, mapping nil to
 // types.StringNull().
