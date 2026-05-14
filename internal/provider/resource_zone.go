@@ -26,8 +26,8 @@ type ZoneResource struct {
 
 // ZoneResourceModel describes the resource data model.
 type ZoneResourceModel struct {
-	ID           types.String `tfsdk:"id"`
-	Name         types.String `tfsdk:"name"`
+	ID           fqdnValue    `tfsdk:"id"`
+	Name         fqdnValue    `tfsdk:"name"`
 	DNSSECStatus types.String `tfsdk:"dnssec_status"`
 }
 
@@ -61,6 +61,7 @@ func (r *ZoneResource) Schema(_ context.Context, _ resource.SchemaRequest, resp 
 		MarkdownDescription: "Manages a DNS zone in OpusDNS.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
+				CustomType:          fqdnType{},
 				Computed:            true,
 				MarkdownDescription: "The zone name (used as the unique identifier).",
 				PlanModifiers: []planmodifier.String{
@@ -68,8 +69,9 @@ func (r *ZoneResource) Schema(_ context.Context, _ resource.SchemaRequest, resp 
 				},
 			},
 			"name": schema.StringAttribute{
+				CustomType:          fqdnType{},
 				Required:            true,
-				MarkdownDescription: "The domain name for the DNS zone (e.g., `example.com`).",
+				MarkdownDescription: "The domain name for the DNS zone (e.g., `example.com`). Semantic equality is used so the trailing dot the API serialises (`example.com.`) is treated as equivalent to the user-supplied form.",
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
 				},
@@ -131,8 +133,8 @@ func (r *ZoneResource) Create(ctx context.Context, req resource.CreateRequest, r
 		})
 	}
 
-	data.ID = types.StringValue(resolvedName)
-	data.Name = types.StringValue(resolvedName)
+	data.ID = fqdnValue{StringValue: types.StringValue(resolvedName)}
+	data.Name = fqdnValue{StringValue: types.StringValue(resolvedName)}
 	data.DNSSECStatus = types.StringValue(string(zone.DNSSECStatus))
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
@@ -166,13 +168,16 @@ func (r *ZoneResource) Read(ctx context.Context, req resource.ReadRequest, resp 
 		return
 	}
 
-	resolvedName := canonicalZoneName(zone.Name)
-	if resolvedName == "" {
-		resolvedName = canonicalZoneName(stateName)
+	// fqdnType's semantic equality lets the framework keep the user's form
+	// in state when the server returns the FQDN with a trailing dot, so no
+	// inline canonicalisation is required here.
+	apiName := zone.Name
+	if apiName == "" {
+		apiName = stateName
 	}
 
-	data.ID = types.StringValue(resolvedName)
-	data.Name = types.StringValue(resolvedName)
+	data.ID = fqdnValue{StringValue: types.StringValue(apiName)}
+	data.Name = fqdnValue{StringValue: types.StringValue(apiName)}
 	data.DNSSECStatus = types.StringValue(string(zone.DNSSECStatus))
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
@@ -221,13 +226,16 @@ func (r *ZoneResource) Update(ctx context.Context, req resource.UpdateRequest, r
 		return
 	}
 
-	resolvedName := canonicalZoneName(zone.Name)
-	if resolvedName == "" {
-		resolvedName = canonicalZoneName(stateName)
+	// fqdnType's semantic equality lets the framework reconcile the
+	// trailing-dot form returned by the API against the user-supplied form
+	// already in state, so no inline canonicalisation is required here.
+	apiName := zone.Name
+	if apiName == "" {
+		apiName = stateName
 	}
 
-	plan.ID = types.StringValue(resolvedName)
-	plan.Name = types.StringValue(resolvedName)
+	plan.ID = fqdnValue{StringValue: types.StringValue(apiName)}
+	plan.Name = fqdnValue{StringValue: types.StringValue(apiName)}
 	plan.DNSSECStatus = types.StringValue(string(zone.DNSSECStatus))
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
@@ -290,8 +298,8 @@ func (r *ZoneResource) ImportState(ctx context.Context, req resource.ImportState
 	}
 
 	data := ZoneResourceModel{
-		ID:           types.StringValue(resolvedName),
-		Name:         types.StringValue(resolvedName),
+		ID:           fqdnValue{StringValue: types.StringValue(resolvedName)},
+		Name:         fqdnValue{StringValue: types.StringValue(resolvedName)},
 		DNSSECStatus: types.StringValue(string(zone.DNSSECStatus)),
 	}
 

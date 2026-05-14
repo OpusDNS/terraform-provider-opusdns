@@ -26,7 +26,7 @@ type EmailForwardResource struct {
 type EmailForwardResourceModel struct {
 	ID             types.String `tfsdk:"id"`
 	EmailForwardID types.String `tfsdk:"email_forward_id"`
-	Hostname       types.String `tfsdk:"hostname"`
+	Hostname       fqdnValue    `tfsdk:"hostname"`
 	Enabled        types.Bool   `tfsdk:"enabled"`
 	Aliases        types.List   `tfsdk:"aliases"`
 }
@@ -70,8 +70,9 @@ func (r *EmailForwardResource) Schema(_ context.Context, _ resource.SchemaReques
 				},
 			},
 			"hostname": schema.StringAttribute{
+				CustomType:          fqdnType{},
 				Required:            true,
-				MarkdownDescription: "The hostname to enable email forwarding for (e.g., `example.com`).",
+				MarkdownDescription: "The hostname to enable email forwarding for (e.g., `example.com`). Semantic equality is used so the trailing dot the API serialises (`example.com.`) is treated as equivalent to the user-supplied form.",
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
 				},
@@ -346,7 +347,7 @@ func setEmailForwardState(ctx context.Context, data *EmailForwardResourceModel, 
 
 	data.ID = types.StringValue(string(ef.EmailForwardID))
 	data.EmailForwardID = types.StringValue(string(ef.EmailForwardID))
-	data.Hostname = types.StringValue(trimTrailingDot(ef.Hostname))
+	data.Hostname = fqdnValue{StringValue: types.StringValue(ef.Hostname)}
 	data.Enabled = types.BoolValue(ef.Enabled)
 
 	aliasObjType := types.ObjectType{AttrTypes: emailForwardAliasAttrTypes}

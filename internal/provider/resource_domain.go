@@ -61,7 +61,7 @@ type DomainResourceModel struct {
 // nameserverAttrTypes describes the object type used for items in the
 // `nameservers` list attribute.
 var nameserverAttrTypes = map[string]attr.Type{
-	"hostname":     types.StringType,
+	"hostname":     fqdnType{},
 	"ip_addresses": types.ListType{ElemType: types.StringType},
 }
 
@@ -185,8 +185,9 @@ func (r *DomainResource) Schema(_ context.Context, _ resource.SchemaRequest, res
 				NestedObject: schema.NestedAttributeObject{
 					Attributes: map[string]schema.Attribute{
 						"hostname": schema.StringAttribute{
+							CustomType:          fqdnType{},
 							Required:            true,
-							MarkdownDescription: "Nameserver hostname (e.g. `ns1.example.com`).",
+							MarkdownDescription: "Nameserver hostname (e.g. `ns1.example.com`). Semantic equality is used so the trailing dot the API serialises is treated as equivalent to the user-supplied form.",
 						},
 						"ip_addresses": schema.ListAttribute{
 							Optional:            true,
@@ -483,8 +484,8 @@ func nameserversListToAPI(ctx context.Context, list types.List) ([]models.Namese
 		return nil, diags
 	}
 	type nsObj struct {
-		Hostname    types.String `tfsdk:"hostname"`
-		IPAddresses types.List   `tfsdk:"ip_addresses"`
+		Hostname    fqdnValue  `tfsdk:"hostname"`
+		IPAddresses types.List `tfsdk:"ip_addresses"`
 	}
 	var items []nsObj
 	diags.Append(list.ElementsAs(ctx, &items, false)...)
@@ -526,7 +527,7 @@ func nameserversAPIToList(ctx context.Context, ns []models.Nameserver) (types.Li
 			return types.ListNull(objType), diags
 		}
 		obj, d := types.ObjectValue(nameserverAttrTypes, map[string]attr.Value{
-			"hostname":     types.StringValue(trimTrailingDot(n.Hostname)),
+			"hostname":     fqdnValue{StringValue: types.StringValue(n.Hostname)},
 			"ip_addresses": ipList,
 		})
 		diags.Append(d...)

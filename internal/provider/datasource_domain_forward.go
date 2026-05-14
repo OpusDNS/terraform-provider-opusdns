@@ -24,8 +24,8 @@ type DomainForwardDataSource struct {
 // DomainForwardDataSourceModel is the data-source state shape. Mirrors the
 // resource model but adds timestamps the resource does not surface.
 type DomainForwardDataSourceModel struct {
-	ID        types.String `tfsdk:"id"`
-	Hostname  types.String `tfsdk:"hostname"`
+	ID        fqdnValue    `tfsdk:"id"`
+	Hostname  fqdnValue    `tfsdk:"hostname"`
 	Enabled   types.Bool   `tfsdk:"enabled"`
 	HTTP      types.List   `tfsdk:"http"`
 	HTTPS     types.List   `tfsdk:"https"`
@@ -46,7 +46,7 @@ func (d *DomainForwardDataSource) Schema(_ context.Context, _ datasource.SchemaR
 	redirectAttrs := map[string]schema.Attribute{
 		"request_path":    schema.StringAttribute{Computed: true, MarkdownDescription: "The source path to match."},
 		"target_protocol": schema.StringAttribute{Computed: true, MarkdownDescription: "The destination protocol (`http` or `https`)."},
-		"target_hostname": schema.StringAttribute{Computed: true, MarkdownDescription: "The destination hostname."},
+		"target_hostname": schema.StringAttribute{CustomType: fqdnType{}, Computed: true, MarkdownDescription: "The destination hostname."},
 		"target_path":     schema.StringAttribute{Computed: true, MarkdownDescription: "The destination path."},
 		"redirect_code":   schema.Int64Attribute{Computed: true, MarkdownDescription: "The HTTP redirect status code."},
 	}
@@ -56,12 +56,14 @@ func (d *DomainForwardDataSource) Schema(_ context.Context, _ datasource.SchemaR
 			"Use `opusdns_domain_forwards` to list all domain forwards in a zone.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
+				CustomType:          fqdnType{},
 				Computed:            true,
 				MarkdownDescription: "Same value as `hostname`.",
 			},
 			"hostname": schema.StringAttribute{
+				CustomType:          fqdnType{},
 				Required:            true,
-				MarkdownDescription: "The source hostname to fetch the forward for (e.g. `www.example.com`).",
+				MarkdownDescription: "The source hostname to fetch the forward for (e.g. `www.example.com`). Semantic equality is used so the trailing-dot form returned by the API is treated as equivalent to the user-supplied form.",
 			},
 			"enabled": schema.BoolAttribute{
 				Computed:            true,
@@ -139,8 +141,8 @@ func (d *DomainForwardDataSource) Read(ctx context.Context, req datasource.ReadR
 func setDomainForwardDataSourceState(ctx context.Context, data *DomainForwardDataSourceModel, df *models.DomainForward) diag.Diagnostics {
 	var diags diag.Diagnostics
 
-	data.ID = types.StringValue(trimTrailingDot(df.Hostname))
-	data.Hostname = types.StringValue(trimTrailingDot(df.Hostname))
+	data.ID = fqdnValue{StringValue: types.StringValue(df.Hostname)}
+	data.Hostname = fqdnValue{StringValue: types.StringValue(df.Hostname)}
 	data.Enabled = types.BoolValue(df.Enabled)
 	data.CreatedOn = types.StringValue(df.CreatedOn.Format(rfc3339))
 	data.UpdatedOn = types.StringValue(df.UpdatedOn.Format(rfc3339))
