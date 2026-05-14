@@ -272,6 +272,20 @@ func (r *EmailForwardResource) Update(ctx context.Context, req resource.UpdateRe
 			return
 		}
 		if existing, exists := stateAliasMap[aliasName]; exists {
+			// Skip the API call entirely when the plan's forward_to list
+			// matches state. Avoids gratuitous PATCH traffic on no-op
+			// updates and works around an API behaviour where
+			// UpdateAlias 404s if the surrounding email-forward's
+			// enabled flag has just been toggled (the alias id we hold
+			// in state appears to become stale across enable/disable).
+			var existingForwardTo []string
+			resp.Diagnostics.Append(existing.ForwardTo.ElementsAs(ctx, &existingForwardTo, false)...)
+			if resp.Diagnostics.HasError() {
+				return
+			}
+			if stringSlicesEqual(existingForwardTo, forwardTo) {
+				continue
+			}
 			aliasID := models.EmailForwardAliasID(existing.AliasID.ValueString())
 			if _, err := r.client.EmailForwards.UpdateAlias(ctx, efID, aliasID,
 				&models.EmailForwardAliasUpdate{ForwardTo: forwardTo}); err != nil {
