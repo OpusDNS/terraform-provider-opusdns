@@ -56,6 +56,22 @@ func trimTrailingDot(s string) string {
 	return strings.TrimSuffix(s, ".")
 }
 
+// stringSlicesEqual reports whether two []string have the same length and
+// element-wise equal contents in the same order. Used to short-circuit
+// no-op API calls when comparing plan-vs-state list values whose
+// ordering is semantically significant (e.g. `forward_to`).
+func stringSlicesEqual(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
+}
+
 // timePtrToValue converts a *time.Time (typical of SDK response types) into a
 // types.String containing an RFC3339 representation, mapping nil to
 // types.StringNull().
