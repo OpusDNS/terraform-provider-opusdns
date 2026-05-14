@@ -148,7 +148,7 @@ func (r *RecordResource) Read(ctx context.Context, req resource.ReadRequest, res
 		return
 	}
 
-	rrset := findRRSet(zone.RRSets, data.Name.ValueString(), models.RRSetType(data.Type.ValueString()))
+	rrset := findRRSet(zone.RRSets, data.Name.ValueString(), models.RRSetType(data.Type.ValueString()), data.ZoneName.ValueString())
 	if rrset == nil {
 		resp.State.RemoveResource(ctx)
 		return
@@ -244,7 +244,7 @@ func (r *RecordResource) ImportState(ctx context.Context, req resource.ImportSta
 		return
 	}
 
-	rrset := findRRSet(zone.RRSets, name, models.RRSetType(rtype))
+	rrset := findRRSet(zone.RRSets, name, models.RRSetType(rtype), zoneName)
 	if rrset == nil {
 		resp.Diagnostics.AddError("Record not found", fmt.Sprintf("No %s record named %q in zone %q.", rtype, name, zoneName))
 		return
@@ -295,13 +295,50 @@ func buildRRSet(ctx context.Context, data RecordResourceModel, diagnostics *diag
 }
 
 // findRRSet finds an RRSet by name and type within a slice.
-func findRRSet(rrsets []models.RRSet, name string, rtype models.RRSetType) *models.RRSet {
+//
+// The OpusDNS API returns RRSet names in fully-qualified form
+// (e.g. `example.com.` for the apex, `www.example.com.` for a subname), while
+// users typically write `@` or relative names like `www` in their configuration.
+// To make lookups work consistently, both sides are normalised to relative
+// form via `relativeRRSetName` before comparison.
+func findRRSet(rrsets []models.RRSet, name string, rtype models.RRSetType, zoneName string) *models.RRSet {
+	target := relativeRRSetName(name, zoneName)
 	for i := range rrsets {
-		if rrsets[i].Name == name && rrsets[i].Type == rtype {
+		if relativeRRSetName(rrsets[i].Name, zoneName) == target && rrsets[i].Type == rtype {
 			return &rrsets[i]
 		}
 	}
 	return nil
+}
+
+// relativeRRSetName converts an RRSet name into its relative-to-zone form.
+//
+// Inputs accepted (with example zoneName `example.com`):
+//
+//	"@"                  -> "@"  (apex, already relative)
+//	""                   -> "@"  (apex shorthand)
+//	"example.com"        -> "@"
+//	"example.com."       -> "@"
+//	"www"                -> "www"
+//	"www.example.com"    -> "www"
+//	"www.example.com."   -> "www"
+//
+// zoneName itself may be supplied with or without a trailing dot; both forms
+// are handled. Names that don't end in the zone are returned with any
+// trailing dot stripped so two callers normalising independently agree.
+func relativeRRSetName(name, zoneName string) string {
+	name = strings.TrimSuffix(name, ".")
+	zone := strings.TrimSuffix(zoneName, ".")
+	if name == "" || name == "@" {
+		return "@"
+	}
+	if name == zone {
+		return "@"
+	}
+	if zone != "" && strings.HasSuffix(name, "."+zone) {
+		return strings.TrimSuffix(name, "."+zone)
+	}
+	return name
 }
 
 // recordID returns the composite ID for a DNS record resource.

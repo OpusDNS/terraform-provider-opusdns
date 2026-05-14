@@ -251,6 +251,8 @@ func (p *OpusDNSProvider) DataSources(_ context.Context) []func() datasource.Dat
 		NewDomainDataSource,
 		NewDomainsDataSource,
 		NewDomainDNSSECDataSource,
+		NewDNSRecordDataSource,
+		NewDNSRecordsDataSource,
 	}
 }
 
