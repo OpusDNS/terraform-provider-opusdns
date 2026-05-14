@@ -372,7 +372,7 @@ func protocolSetToList(ctx context.Context, ps *models.DomainForwardProtocolSet,
 		obj, d := types.ObjectValue(httpRedirectAttrTypes, map[string]attr.Value{
 			"request_path":    types.StringValue(r.RequestPath),
 			"target_protocol": types.StringValue(string(r.TargetProtocol)),
-			"target_hostname": types.StringValue(r.TargetHostname),
+			"target_hostname": types.StringValue(trimTrailingDot(r.TargetHostname)),
 			"target_path":     types.StringValue(r.TargetPath),
 			"redirect_code":   types.Int64Value(int64(r.RedirectCode)),
 		})
