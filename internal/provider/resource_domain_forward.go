@@ -25,17 +25,17 @@ type DomainForwardResource struct {
 }
 
 type DomainForwardResourceModel struct {
-	ID       types.String `tfsdk:"id"`
-	Hostname types.String `tfsdk:"hostname"`
-	Enabled  types.Bool   `tfsdk:"enabled"`
-	HTTP     types.List   `tfsdk:"http"`
-	HTTPS    types.List   `tfsdk:"https"`
+	ID       fqdnValue  `tfsdk:"id"`
+	Hostname fqdnValue  `tfsdk:"hostname"`
+	Enabled  types.Bool `tfsdk:"enabled"`
+	HTTP     types.List `tfsdk:"http"`
+	HTTPS    types.List `tfsdk:"https"`
 }
 
 type HttpRedirectModel struct {
 	RequestPath    types.String `tfsdk:"request_path"`
 	TargetProtocol types.String `tfsdk:"target_protocol"`
-	TargetHostname types.String `tfsdk:"target_hostname"`
+	TargetHostname fqdnValue    `tfsdk:"target_hostname"`
 	TargetPath     types.String `tfsdk:"target_path"`
 	RedirectCode   types.Int64  `tfsdk:"redirect_code"`
 }
@@ -43,7 +43,7 @@ type HttpRedirectModel struct {
 var httpRedirectAttrTypes = map[string]attr.Type{
 	"request_path":    types.StringType,
 	"target_protocol": types.StringType,
-	"target_hostname": types.StringType,
+	"target_hostname": fqdnType{},
 	"target_path":     types.StringType,
 	"redirect_code":   types.Int64Type,
 }
@@ -68,8 +68,9 @@ func (r *DomainForwardResource) Schema(_ context.Context, _ resource.SchemaReque
 				MarkdownDescription: "The destination protocol (`http` or `https`).",
 			},
 			"target_hostname": schema.StringAttribute{
+				CustomType:          fqdnType{},
 				Required:            true,
-				MarkdownDescription: "The destination hostname.",
+				MarkdownDescription: "The destination hostname. Semantic equality is used so the trailing dot the API serialises is treated as equivalent to the user-supplied form.",
 			},
 			"target_path": schema.StringAttribute{
 				Required:            true,
@@ -89,6 +90,7 @@ func (r *DomainForwardResource) Schema(_ context.Context, _ resource.SchemaReque
 		MarkdownDescription: "Manages URL/domain forwarding for a hostname in OpusDNS.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
+				CustomType:          fqdnType{},
 				Computed:            true,
 				MarkdownDescription: "The hostname (used as the unique identifier).",
 				PlanModifiers: []planmodifier.String{
@@ -96,8 +98,9 @@ func (r *DomainForwardResource) Schema(_ context.Context, _ resource.SchemaReque
 				},
 			},
 			"hostname": schema.StringAttribute{
+				CustomType:          fqdnType{},
 				Required:            true,
-				MarkdownDescription: "The source hostname to forward from (e.g., `www.example.com`).",
+				MarkdownDescription: "The source hostname to forward from (e.g., `www.example.com`). Semantic equality is used so the trailing dot the API serialises (`www.example.com.`) is treated as equivalent to the user-supplied form.",
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
 				},
@@ -334,8 +337,11 @@ func buildProtocolSetRequest(ctx context.Context, redirectList types.List) (*mod
 func setDomainForwardState(ctx context.Context, data *DomainForwardResourceModel, df *models.DomainForward) diag.Diagnostics {
 	var diagnostics diag.Diagnostics
 
-	data.ID = types.StringValue(trimTrailingDot(df.Hostname))
-	data.Hostname = types.StringValue(trimTrailingDot(df.Hostname))
+	// fqdnType semantic equality lets the framework reconcile the
+	// trailing-dot form returned by the API against the user-supplied form
+	// in state, so no inline canonicalisation is required here.
+	data.ID = fqdnValue{StringValue: types.StringValue(df.Hostname)}
+	data.Hostname = fqdnValue{StringValue: types.StringValue(df.Hostname)}
 	data.Enabled = types.BoolValue(df.Enabled)
 
 	redirectObjType := types.ObjectType{AttrTypes: httpRedirectAttrTypes}
@@ -372,7 +378,7 @@ func protocolSetToList(ctx context.Context, ps *models.DomainForwardProtocolSet,
 		obj, d := types.ObjectValue(httpRedirectAttrTypes, map[string]attr.Value{
 			"request_path":    types.StringValue(r.RequestPath),
 			"target_protocol": types.StringValue(string(r.TargetProtocol)),
-			"target_hostname": types.StringValue(trimTrailingDot(r.TargetHostname)),
+			"target_hostname": fqdnValue{StringValue: types.StringValue(r.TargetHostname)},
 			"target_path":     types.StringValue(r.TargetPath),
 			"redirect_code":   types.Int64Value(int64(r.RedirectCode)),
 		})

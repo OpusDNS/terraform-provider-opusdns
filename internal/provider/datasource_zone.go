@@ -20,8 +20,8 @@ type ZoneDataSource struct {
 
 // ZoneDataSourceModel describes the data source data model.
 type ZoneDataSourceModel struct {
-	ID           types.String `tfsdk:"id"`
-	Name         types.String `tfsdk:"name"`
+	ID           fqdnValue    `tfsdk:"id"`
+	Name         fqdnValue    `tfsdk:"name"`
 	DNSSECStatus types.String `tfsdk:"dnssec_status"`
 }
 
@@ -39,10 +39,12 @@ func (d *ZoneDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, r
 		MarkdownDescription: "Fetches information about an existing DNS zone in OpusDNS.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
+				CustomType:          fqdnType{},
 				Computed:            true,
 				MarkdownDescription: "The zone name (used as the unique identifier).",
 			},
 			"name": schema.StringAttribute{
+				CustomType:          fqdnType{},
 				Required:            true,
 				MarkdownDescription: "The domain name of the DNS zone (e.g., `example.com`).",
 			},
@@ -82,8 +84,10 @@ func (d *ZoneDataSource) Read(ctx context.Context, req datasource.ReadRequest, r
 		return
 	}
 
-	data.ID = types.StringValue(canonicalZoneName(zone.Name))
-	data.Name = types.StringValue(canonicalZoneName(zone.Name))
+	// fqdnType semantic equality keeps the user-supplied form in state even
+	// when the API returns the FQDN with a trailing dot.
+	data.ID = fqdnValue{StringValue: types.StringValue(zone.Name)}
+	data.Name = fqdnValue{StringValue: types.StringValue(zone.Name)}
 	data.DNSSECStatus = types.StringValue(string(zone.DNSSECStatus))
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
