@@ -256,6 +256,10 @@ func (p *OpusDNSProvider) DataSources(_ context.Context) []func() datasource.Dat
 		NewDomainAvailabilityDataSource,
 		NewTLDDataSource,
 		NewTLDsDataSource,
+		NewEmailForwardDataSource,
+		NewEmailForwardsDataSource,
+		NewDomainForwardDataSource,
+		NewDomainForwardsDataSource,
 	}
 }
 
