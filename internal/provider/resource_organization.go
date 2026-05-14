@@ -238,33 +238,81 @@ func (r *OrganizationResource) Read(ctx context.Context, req resource.ReadReques
 }
 
 func (r *OrganizationResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
-	var plan OrganizationResourceModel
+	var plan, state OrganizationResourceModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
+	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
 	updateReq := &models.OrganizationUpdateRequest{}
-	updateReq.Name = optionalStringPtr(plan.Name)
-	updateReq.Address1 = optionalStringPtr(plan.Address1)
-	updateReq.Address2 = optionalStringPtr(plan.Address2)
-	updateReq.City = optionalStringPtr(plan.City)
-	updateReq.State = optionalStringPtr(plan.State)
-	updateReq.PostalCode = optionalStringPtr(plan.PostalCode)
-	updateReq.CountryCode = optionalStringPtr(plan.CountryCode)
-	updateReq.BusinessNumber = optionalStringPtr(plan.BusinessNumber)
-	updateReq.TaxID = optionalStringPtr(plan.TaxID)
-	updateReq.TaxIDType = optionalStringPtr(plan.TaxIDType)
-	updateReq.DefaultLocale = optionalStringPtr(plan.DefaultLocale)
-	if !plan.Currency.IsNull() && !plan.Currency.IsUnknown() {
+	hasChange := false
+
+	if !plan.Name.Equal(state.Name) {
+		updateReq.Name = optionalStringPtr(plan.Name)
+		hasChange = true
+	}
+	if !plan.Address1.Equal(state.Address1) {
+		updateReq.Address1 = optionalStringPtr(plan.Address1)
+		hasChange = true
+	}
+	if !plan.Address2.Equal(state.Address2) {
+		updateReq.Address2 = optionalStringPtr(plan.Address2)
+		hasChange = true
+	}
+	if !plan.City.Equal(state.City) {
+		updateReq.City = optionalStringPtr(plan.City)
+		hasChange = true
+	}
+	if !plan.State.Equal(state.State) {
+		updateReq.State = optionalStringPtr(plan.State)
+		hasChange = true
+	}
+	if !plan.PostalCode.Equal(state.PostalCode) {
+		updateReq.PostalCode = optionalStringPtr(plan.PostalCode)
+		hasChange = true
+	}
+	if !plan.CountryCode.Equal(state.CountryCode) {
+		updateReq.CountryCode = optionalStringPtr(plan.CountryCode)
+		hasChange = true
+	}
+	if !plan.BusinessNumber.Equal(state.BusinessNumber) {
+		updateReq.BusinessNumber = optionalStringPtr(plan.BusinessNumber)
+		hasChange = true
+	}
+	if !plan.TaxID.Equal(state.TaxID) {
+		updateReq.TaxID = optionalStringPtr(plan.TaxID)
+		hasChange = true
+	}
+	if !plan.TaxIDType.Equal(state.TaxIDType) {
+		updateReq.TaxIDType = optionalStringPtr(plan.TaxIDType)
+		hasChange = true
+	}
+	if !plan.DefaultLocale.Equal(state.DefaultLocale) {
+		updateReq.DefaultLocale = optionalStringPtr(plan.DefaultLocale)
+		hasChange = true
+	}
+	if !plan.Currency.Equal(state.Currency) && !plan.Currency.IsNull() && !plan.Currency.IsUnknown() {
 		c := models.Currency(plan.Currency.ValueString())
 		updateReq.Currency = &c
+		hasChange = true
 	}
 
-	org, err := r.client.Organizations.UpdateOrganization(ctx, models.OrganizationID(plan.OrganizationID.ValueString()), updateReq)
-	if err != nil {
-		resp.Diagnostics.AddError("Error updating organization", formatAPIError(err))
-		return
+	var org *models.Organization
+	if hasChange {
+		updated, err := r.client.Organizations.UpdateOrganization(ctx, models.OrganizationID(plan.OrganizationID.ValueString()), updateReq)
+		if err != nil {
+			resp.Diagnostics.AddError("Error updating organization", formatAPIError(err))
+			return
+		}
+		org = updated
+	} else {
+		current, err := r.client.Organizations.GetOrganization(ctx, models.OrganizationID(plan.OrganizationID.ValueString()))
+		if err != nil {
+			resp.Diagnostics.AddError("Error reading organization", formatAPIError(err))
+			return
+		}
+		org = current
 	}
 
 	populateOrganizationModel(&plan, org)

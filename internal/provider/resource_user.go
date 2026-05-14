@@ -184,23 +184,48 @@ func (r *UserResource) Read(ctx context.Context, req resource.ReadRequest, resp 
 }
 
 func (r *UserResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
-	var plan UserResourceModel
+	var plan, state UserResourceModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
+	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	updateReq := &models.UserUpdateRequest{
-		FirstName: optionalStringPtr(plan.FirstName),
-		LastName:  optionalStringPtr(plan.LastName),
-		Phone:     optionalStringPtr(plan.Phone),
-		Locale:    optionalStringPtr(plan.Locale),
+	updateReq := &models.UserUpdateRequest{}
+	hasChange := false
+
+	if !plan.FirstName.Equal(state.FirstName) {
+		updateReq.FirstName = optionalStringPtr(plan.FirstName)
+		hasChange = true
+	}
+	if !plan.LastName.Equal(state.LastName) {
+		updateReq.LastName = optionalStringPtr(plan.LastName)
+		hasChange = true
+	}
+	if !plan.Phone.Equal(state.Phone) {
+		updateReq.Phone = optionalStringPtr(plan.Phone)
+		hasChange = true
+	}
+	if !plan.Locale.Equal(state.Locale) {
+		updateReq.Locale = optionalStringPtr(plan.Locale)
+		hasChange = true
 	}
 
-	user, err := r.client.Users.UpdateUser(ctx, models.UserID(plan.UserID.ValueString()), updateReq)
-	if err != nil {
-		resp.Diagnostics.AddError("Error updating user", formatAPIError(err))
-		return
+	var user *models.User
+	if hasChange {
+		updated, err := r.client.Users.UpdateUser(ctx, models.UserID(plan.UserID.ValueString()), updateReq)
+		if err != nil {
+			resp.Diagnostics.AddError("Error updating user", formatAPIError(err))
+			return
+		}
+		user = updated
+	} else {
+		current, err := r.client.Users.GetUser(ctx, models.UserID(plan.UserID.ValueString()))
+		if err != nil {
+			resp.Diagnostics.AddError("Error reading user", formatAPIError(err))
+			return
+		}
+		user = current
 	}
 
 	populateUserModel(&plan, user)
