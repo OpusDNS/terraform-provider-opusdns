@@ -3,6 +3,7 @@ package provider
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -33,6 +34,22 @@ type ZoneResourceModel struct {
 // NewZoneResource returns a new ZoneResource.
 func NewZoneResource() resource.Resource {
 	return &ZoneResource{}
+}
+
+// canonicalZoneName returns the canonical (non-FQDN) form of a zone name.
+//
+// The OpusDNS API serialises zone names with a trailing dot
+// (e.g. `example.com.`), while users write them without
+// (e.g. `example.com`). Persisting the API form in state causes
+// terraform to detect drift on every refresh and trigger a replace,
+// which in turn destroys all dependent record resources.
+//
+// We canonicalise to the non-FQDN form because that is what the
+// CreateZone API accepts as input and what users naturally type in
+// their configurations. The SDK already strips trailing dots before
+// issuing GetZone/DeleteZone, so this form is round-trip safe.
+func canonicalZoneName(name string) string {
+	return strings.TrimSuffix(name, ".")
 }
 
 func (r *ZoneResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -106,9 +123,9 @@ func (r *ZoneResource) Create(ctx context.Context, req resource.CreateRequest, r
 	// name we requested. Without this guard, an empty name would be persisted
 	// to state and subsequent Read/Delete calls would issue malformed requests
 	// (e.g. DELETE /v1/dns/ -> 405 Method Not Allowed).
-	resolvedName := zone.Name
+	resolvedName := canonicalZoneName(zone.Name)
 	if resolvedName == "" {
-		resolvedName = requestedName
+		resolvedName = canonicalZoneName(requestedName)
 		tflog.Warn(ctx, "CreateZone response did not include a zone name; falling back to requested name", map[string]interface{}{
 			"requested_name": requestedName,
 		})
@@ -149,9 +166,9 @@ func (r *ZoneResource) Read(ctx context.Context, req resource.ReadRequest, resp 
 		return
 	}
 
-	resolvedName := zone.Name
+	resolvedName := canonicalZoneName(zone.Name)
 	if resolvedName == "" {
-		resolvedName = stateName
+		resolvedName = canonicalZoneName(stateName)
 	}
 
 	data.ID = types.StringValue(resolvedName)
@@ -204,9 +221,9 @@ func (r *ZoneResource) Update(ctx context.Context, req resource.UpdateRequest, r
 		return
 	}
 
-	resolvedName := zone.Name
+	resolvedName := canonicalZoneName(zone.Name)
 	if resolvedName == "" {
-		resolvedName = stateName
+		resolvedName = canonicalZoneName(stateName)
 	}
 
 	plan.ID = types.StringValue(resolvedName)
@@ -267,9 +284,9 @@ func (r *ZoneResource) ImportState(ctx context.Context, req resource.ImportState
 		return
 	}
 
-	resolvedName := zone.Name
+	resolvedName := canonicalZoneName(zone.Name)
 	if resolvedName == "" {
-		resolvedName = req.ID
+		resolvedName = canonicalZoneName(req.ID)
 	}
 
 	data := ZoneResourceModel{

@@ -82,8 +82,8 @@ func (d *ZoneDataSource) Read(ctx context.Context, req datasource.ReadRequest, r
 		return
 	}
 
-	data.ID = types.StringValue(zone.Name)
-	data.Name = types.StringValue(zone.Name)
+	data.ID = types.StringValue(canonicalZoneName(zone.Name))
+	data.Name = types.StringValue(canonicalZoneName(zone.Name))
 	data.DNSSECStatus = types.StringValue(string(zone.DNSSECStatus))
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
