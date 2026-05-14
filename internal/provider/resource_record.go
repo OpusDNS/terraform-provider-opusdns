@@ -138,7 +138,19 @@ func (r *RecordResource) Read(ctx context.Context, req resource.ReadRequest, res
 		return
 	}
 
-	zone, err := r.client.DNS.GetZone(ctx, data.ZoneName.ValueString())
+	zoneName := data.ZoneName.ValueString()
+	recordName := data.Name.ValueString()
+	recordType := data.Type.ValueString()
+	if zoneName == "" || recordName == "" || recordType == "" {
+		resp.Diagnostics.AddError(
+			"Invalid DNS record state",
+			"The opusdns_record resource has an empty `zone_name`, `name`, or `type` in state, which prevents reading it from the API. "+
+				"Remove the resource from state with `terraform state rm` and re-import or recreate it.",
+		)
+		return
+	}
+
+	zone, err := r.client.DNS.GetZone(ctx, zoneName)
 	if err != nil {
 		if isNotFound(err) {
 			resp.State.RemoveResource(ctx)
@@ -148,7 +160,7 @@ func (r *RecordResource) Read(ctx context.Context, req resource.ReadRequest, res
 		return
 	}
 
-	rrset := findRRSet(zone.RRSets, data.Name.ValueString(), models.RRSetType(data.Type.ValueString()), data.ZoneName.ValueString())
+	rrset := findRRSet(zone.RRSets, recordName, models.RRSetType(recordType), zoneName)
 	if rrset == nil {
 		resp.State.RemoveResource(ctx)
 		return
@@ -167,7 +179,7 @@ func (r *RecordResource) Read(ctx context.Context, req resource.ReadRequest, res
 
 	data.TTL = types.Int64Value(int64(rrset.TTL))
 	data.Records = recordList
-	data.ID = types.StringValue(recordID(data.ZoneName.ValueString(), data.Name.ValueString(), data.Type.ValueString()))
+	data.ID = types.StringValue(recordID(zoneName, recordName, recordType))
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
@@ -203,12 +215,24 @@ func (r *RecordResource) Delete(ctx context.Context, req resource.DeleteRequest,
 		return
 	}
 
-	err := r.client.DNS.PatchRRSets(ctx, data.ZoneName.ValueString(), []models.RRSetPatchOp{
+	zoneName := data.ZoneName.ValueString()
+	recordName := data.Name.ValueString()
+	recordType := data.Type.ValueString()
+	if zoneName == "" || recordName == "" || recordType == "" {
+		resp.Diagnostics.AddError(
+			"Invalid DNS record state",
+			"The opusdns_record resource has an empty `zone_name`, `name`, or `type` in state, which prevents deletion via the API. "+
+				"Remove the resource from state with `terraform state rm` and, if the record still exists at OpusDNS, delete it manually or re-import then destroy.",
+		)
+		return
+	}
+
+	err := r.client.DNS.PatchRRSets(ctx, zoneName, []models.RRSetPatchOp{
 		{
 			Op: models.RecordOpRemove,
 			RRSet: models.RRSetPatch{
-				Name: data.Name.ValueString(),
-				Type: models.RRSetType(data.Type.ValueString()),
+				Name: recordName,
+				Type: models.RRSetType(recordType),
 				// The API rejects a null `records` field (422
 				// list_type validation error) even on remove ops,
 				// because the SDK's RRSetPatch.Records is not

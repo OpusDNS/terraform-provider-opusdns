@@ -298,6 +298,14 @@ func (r *DomainDNSSECResource) Update(ctx context.Context, req resource.UpdateRe
 	}
 
 	domainRef := plan.DomainRef.ValueString()
+	if domainRef == "" {
+		resp.Diagnostics.AddError(
+			"Invalid DNSSEC state",
+			"The opusdns_domain_dnssec resource has an empty `domain_ref` in plan, which prevents updating it. "+
+				"Remove the resource from state with `terraform state rm` and re-import.",
+		)
+		return
+	}
 	wasEnabled := !state.Enabled.IsNull() && !state.Enabled.IsUnknown() && state.Enabled.ValueBool()
 	enabled := !plan.Enabled.IsNull() && !plan.Enabled.IsUnknown() && plan.Enabled.ValueBool()
 

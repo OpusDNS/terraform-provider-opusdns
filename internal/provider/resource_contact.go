@@ -213,7 +213,17 @@ func (r *ContactResource) Read(ctx context.Context, req resource.ReadRequest, re
 		return
 	}
 
-	contact, err := r.client.Contacts.GetContact(ctx, models.ContactID(data.ContactID.ValueString()))
+	contactIDStr := data.ContactID.ValueString()
+	if contactIDStr == "" {
+		resp.Diagnostics.AddError(
+			"Invalid contact state",
+			"The opusdns_contact resource has an empty `contact_id` in state, which prevents reading it from the API. "+
+				"Remove the resource from state with `terraform state rm` and re-import or recreate it.",
+		)
+		return
+	}
+
+	contact, err := r.client.Contacts.GetContact(ctx, models.ContactID(contactIDStr))
 	if err != nil {
 		if isNotFound(err) {
 			resp.State.RemoveResource(ctx)
@@ -238,7 +248,17 @@ func (r *ContactResource) Delete(ctx context.Context, req resource.DeleteRequest
 		return
 	}
 
-	if err := r.client.Contacts.DeleteContact(ctx, models.ContactID(data.ContactID.ValueString())); err != nil {
+	contactIDStr := data.ContactID.ValueString()
+	if contactIDStr == "" {
+		resp.Diagnostics.AddError(
+			"Invalid contact state",
+			"The opusdns_contact resource has an empty `contact_id` in state, which prevents deletion via the API. "+
+				"Remove the resource from state with `terraform state rm` and, if the contact still exists at OpusDNS, delete it manually or re-import then destroy.",
+		)
+		return
+	}
+
+	if err := r.client.Contacts.DeleteContact(ctx, models.ContactID(contactIDStr)); err != nil {
 		if !isNotFound(err) {
 			resp.Diagnostics.AddError("Error deleting contact", formatAPIError(err))
 		}

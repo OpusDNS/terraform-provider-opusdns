@@ -196,7 +196,17 @@ func (r *EmailForwardResource) Read(ctx context.Context, req resource.ReadReques
 		return
 	}
 
-	ef, err := r.client.EmailForwards.GetEmailForward(ctx, models.EmailForwardID(data.EmailForwardID.ValueString()))
+	efIDStr := data.EmailForwardID.ValueString()
+	if efIDStr == "" {
+		resp.Diagnostics.AddError(
+			"Invalid email forward state",
+			"The opusdns_email_forward resource has an empty `email_forward_id` in state, which prevents reading it from the API. "+
+				"Remove the resource from state with `terraform state rm` and re-import or recreate it.",
+		)
+		return
+	}
+
+	ef, err := r.client.EmailForwards.GetEmailForward(ctx, models.EmailForwardID(efIDStr))
 	if err != nil {
 		if isNotFound(err) {
 			resp.State.RemoveResource(ctx)
@@ -220,7 +230,16 @@ func (r *EmailForwardResource) Update(ctx context.Context, req resource.UpdateRe
 		return
 	}
 
-	efID := models.EmailForwardID(state.EmailForwardID.ValueString())
+	efIDStr := state.EmailForwardID.ValueString()
+	if efIDStr == "" {
+		resp.Diagnostics.AddError(
+			"Invalid email forward state",
+			"The opusdns_email_forward resource has an empty `email_forward_id` in state, which prevents updating it. "+
+				"Remove the resource from state with `terraform state rm` and re-import or recreate it.",
+		)
+		return
+	}
+	efID := models.EmailForwardID(efIDStr)
 
 	if plan.Enabled.ValueBool() != state.Enabled.ValueBool() {
 		if plan.Enabled.ValueBool() {
@@ -322,7 +341,16 @@ func (r *EmailForwardResource) Delete(ctx context.Context, req resource.DeleteRe
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	if err := r.client.EmailForwards.DeleteEmailForward(ctx, models.EmailForwardID(data.EmailForwardID.ValueString())); err != nil {
+	efIDStr := data.EmailForwardID.ValueString()
+	if efIDStr == "" {
+		resp.Diagnostics.AddError(
+			"Invalid email forward state",
+			"The opusdns_email_forward resource has an empty `email_forward_id` in state, which prevents deletion via the API. "+
+				"Remove the resource from state with `terraform state rm` and, if the forward still exists at OpusDNS, delete it manually or re-import then destroy.",
+		)
+		return
+	}
+	if err := r.client.EmailForwards.DeleteEmailForward(ctx, models.EmailForwardID(efIDStr)); err != nil {
 		if !isNotFound(err) {
 			resp.Diagnostics.AddError("Error deleting email forward", formatAPIError(err))
 		}
