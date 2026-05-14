@@ -178,8 +178,8 @@ func domainForwardToObjectValue(ctx context.Context, df *models.DomainForward) (
 	}
 
 	obj, d := types.ObjectValue(domainForwardListObjectAttrTypes, map[string]attr.Value{
-		"id":         types.StringValue(df.Hostname),
-		"hostname":   types.StringValue(df.Hostname),
+		"id":         types.StringValue(trimTrailingDot(df.Hostname)),
+		"hostname":   types.StringValue(trimTrailingDot(df.Hostname)),
 		"enabled":    types.BoolValue(df.Enabled),
 		"http":       httpList,
 		"https":      httpsList,
