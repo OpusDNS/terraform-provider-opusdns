@@ -46,6 +46,15 @@ func stringPtrToValue(p *string) types.String {
 	return types.StringValue(*p)
 }
 
+// trimTrailingDot removes a single trailing `.` from a hostname. The OpusDNS
+// API returns hostnames in fully-qualified form with a trailing dot (e.g.
+// `example.com.`), but Terraform users supply, and naturally compare, the
+// dot-less form. Strip on the way into state so plan-vs-state diffs and
+// post-apply consistency checks align.
+func trimTrailingDot(s string) string {
+	return strings.TrimSuffix(s, ".")
+}
+
 // timePtrToValue converts a *time.Time (typical of SDK response types) into a
 // types.String containing an RFC3339 representation, mapping nil to
 // types.StringNull().

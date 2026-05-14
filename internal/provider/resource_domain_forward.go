@@ -334,8 +334,8 @@ func buildProtocolSetRequest(ctx context.Context, redirectList types.List) (*mod
 func setDomainForwardState(ctx context.Context, data *DomainForwardResourceModel, df *models.DomainForward) diag.Diagnostics {
 	var diagnostics diag.Diagnostics
 
-	data.ID = types.StringValue(df.Hostname)
-	data.Hostname = types.StringValue(df.Hostname)
+	data.ID = types.StringValue(trimTrailingDot(df.Hostname))
+	data.Hostname = types.StringValue(trimTrailingDot(df.Hostname))
 	data.Enabled = types.BoolValue(df.Enabled)
 
 	redirectObjType := types.ObjectType{AttrTypes: httpRedirectAttrTypes}
