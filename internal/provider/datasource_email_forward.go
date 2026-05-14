@@ -140,7 +140,7 @@ func setEmailForwardDataSourceState(ctx context.Context, data *EmailForwardDataS
 
 	data.ID = types.StringValue(string(ef.EmailForwardID))
 	data.EmailForwardID = types.StringValue(string(ef.EmailForwardID))
-	data.Hostname = types.StringValue(ef.Hostname)
+	data.Hostname = types.StringValue(trimTrailingDot(ef.Hostname))
 	data.Enabled = types.BoolValue(ef.Enabled)
 	data.CreatedOn = types.StringValue(ef.CreatedOn.Format(rfc3339))
 	data.UpdatedOn = types.StringValue(ef.UpdatedOn.Format(rfc3339))

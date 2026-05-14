@@ -126,7 +126,7 @@ func (d *EmailForwardsDataSource) Read(ctx context.Context, req datasource.ReadR
 		return
 	}
 
-	efs, err := d.client.EmailForwards.ListEmailForwardsByZone(ctx, zoneName)
+	efs, err := rawListEmailForwardsByZone(ctx, d.client, zoneName)
 	if err != nil {
 		resp.Diagnostics.AddError("Error listing email forwards", formatAPIError(err))
 		return
@@ -186,7 +186,7 @@ func emailForwardToObjectValue(ctx context.Context, ef *models.EmailForward) (at
 	obj, d := types.ObjectValue(emailForwardListObjectAttrTypes, map[string]attr.Value{
 		"id":               types.StringValue(string(ef.EmailForwardID)),
 		"email_forward_id": types.StringValue(string(ef.EmailForwardID)),
-		"hostname":         types.StringValue(ef.Hostname),
+		"hostname":         types.StringValue(trimTrailingDot(ef.Hostname)),
 		"enabled":          types.BoolValue(ef.Enabled),
 		"aliases":          aliasList,
 		"created_on":       types.StringValue(ef.CreatedOn.Format(rfc3339)),

@@ -139,8 +139,8 @@ func (d *DomainForwardDataSource) Read(ctx context.Context, req datasource.ReadR
 func setDomainForwardDataSourceState(ctx context.Context, data *DomainForwardDataSourceModel, df *models.DomainForward) diag.Diagnostics {
 	var diags diag.Diagnostics
 
-	data.ID = types.StringValue(df.Hostname)
-	data.Hostname = types.StringValue(df.Hostname)
+	data.ID = types.StringValue(trimTrailingDot(df.Hostname))
+	data.Hostname = types.StringValue(trimTrailingDot(df.Hostname))
 	data.Enabled = types.BoolValue(df.Enabled)
 	data.CreatedOn = types.StringValue(df.CreatedOn.Format(rfc3339))
 	data.UpdatedOn = types.StringValue(df.UpdatedOn.Format(rfc3339))

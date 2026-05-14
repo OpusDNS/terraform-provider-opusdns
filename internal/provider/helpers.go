@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/url"
 	"strings"
 	"time"
 
@@ -119,4 +120,31 @@ func rawDeleteOrganization(ctx context.Context, c *opusdns.Client, orgID models.
 		return err
 	}
 	return c.HTTPClient().DecodeResponse(resp, nil)
+}
+
+// rawListEmailForwardsByZone wraps GET /v1/dns/{zone}/email-forwards.
+//
+// The SDK as of v1.0.9 declares this endpoint as returning a bare
+// []models.EmailForward, but the API actually returns an EmailForwardZone
+// wrapper object ({zone_id, zone_name, email_forwards: [...]}), which makes
+// the SDK helper fail to decode. The sibling DomainForwards SDK service
+// already handles this with a wrapper-first / list-fallback decode; this
+// helper does the same for email forwards until the SDK is fixed upstream.
+func rawListEmailForwardsByZone(ctx context.Context, c *opusdns.Client, zoneName string) ([]models.EmailForward, error) {
+	path := c.HTTPClient().BuildPath("dns", url.PathEscape(zoneName), "email-forwards")
+	resp, err := c.HTTPClient().Get(ctx, path, nil)
+	if err != nil {
+		return nil, err
+	}
+	// Try the wrapper shape the API actually returns first; fall back to a
+	// bare list for forwards-compatibility if the API ever returns one.
+	var zone models.EmailForwardZone
+	if decErr := c.HTTPClient().DecodeResponse(resp, &zone); decErr == nil {
+		return zone.EmailForwards, nil
+	}
+	var list []models.EmailForward
+	if decErr := c.HTTPClient().DecodeResponse(resp, &list); decErr != nil {
+		return nil, decErr
+	}
+	return list, nil
 }
