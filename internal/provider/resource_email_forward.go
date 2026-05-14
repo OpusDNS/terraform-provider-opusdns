@@ -163,6 +163,17 @@ func (r *EmailForwardResource) Create(ctx context.Context, req resource.CreateRe
 			resp.Diagnostics.AddError("Error disabling email forward", formatAPIError(err))
 			return
 		}
+	} else {
+		// The create endpoint has no `enabled` field; new forwards land in
+		// the API's default state (currently `false`). To honour the
+		// resource's default of `true`, explicitly enable the forward
+		// after creation when the plan calls for it. Without this, the
+		// follow-up Get returns `enabled = false` and Terraform reports
+		// an "inconsistent result" error.
+		if err := r.client.EmailForwards.EnableEmailForward(ctx, ef.EmailForwardID); err != nil {
+			resp.Diagnostics.AddError("Error enabling email forward", formatAPIError(err))
+			return
+		}
 	}
 
 	ef, err = r.client.EmailForwards.GetEmailForward(ctx, ef.EmailForwardID)
@@ -321,7 +332,7 @@ func setEmailForwardState(ctx context.Context, data *EmailForwardResourceModel, 
 
 	data.ID = types.StringValue(string(ef.EmailForwardID))
 	data.EmailForwardID = types.StringValue(string(ef.EmailForwardID))
-	data.Hostname = types.StringValue(ef.Hostname)
+	data.Hostname = types.StringValue(trimTrailingDot(ef.Hostname))
 	data.Enabled = types.BoolValue(ef.Enabled)
 
 	aliasObjType := types.ObjectType{AttrTypes: emailForwardAliasAttrTypes}
