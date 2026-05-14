@@ -196,6 +196,21 @@ resource "opusdns_user" "alice" {
 
 **Import:** `terraform import opusdns_user.alice <user_id>`
 
+### `opusdns_tag`
+
+Manages a tag (`/v1/tags`). Tags categorize resources (`DOMAIN`, `CONTACT`, or `ZONE`). The `type` field is immutable — changing it forces replacement; `label`, `color`, and `description` are updatable in place.
+
+```hcl
+resource "opusdns_tag" "production" {
+  label       = "production"
+  type        = "DOMAIN"
+  color       = "color-3"
+  description = "Tags production-tier domains."
+}
+```
+
+**Import:** `terraform import opusdns_tag.production <tag_id>`
+
 ## Data Sources
 
 ### `data.opusdns_zone`
@@ -261,6 +276,31 @@ data "opusdns_users" "all" {}
 
 output "usernames" {
   value = [for u in data.opusdns_users.all.users : u.username]
+}
+```
+
+### `data.opusdns_tag`
+
+Fetches a single tag by id (`GET /v1/tags/{tag_id}`).
+
+```hcl
+data "opusdns_tag" "production" {
+  tag_id = "tag_01jxxxxxxxxxxxxxxxxxxxxxxx"
+}
+```
+
+### `data.opusdns_tags`
+
+Lists tags in the authenticated caller's organization (`GET /v1/tags`). Optional `search` and `tag_types` filters narrow the server-side query.
+
+```hcl
+data "opusdns_tags" "domain_prod" {
+  search    = "prod"
+  tag_types = ["DOMAIN"]
+}
+
+output "tag_labels" {
+  value = [for t in data.opusdns_tags.domain_prod.tags : t.label]
 }
 ```
 
