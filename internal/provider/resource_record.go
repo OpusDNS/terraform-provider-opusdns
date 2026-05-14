@@ -209,6 +209,12 @@ func (r *RecordResource) Delete(ctx context.Context, req resource.DeleteRequest,
 			RRSet: models.RRSetPatch{
 				Name: data.Name.ValueString(),
 				Type: models.RRSetType(data.Type.ValueString()),
+				// The API rejects a null `records` field (422
+				// list_type validation error) even on remove ops,
+				// because the SDK's RRSetPatch.Records is not
+				// `omitempty`. Send an explicit empty list so the
+				// JSON wire form is `"records": []`.
+				Records: []models.RecordCreate{},
 			},
 		},
 	})
