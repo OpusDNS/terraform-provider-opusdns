@@ -33,7 +33,7 @@ type UserResourceModel struct {
 	FirstName      types.String `tfsdk:"first_name"`
 	LastName       types.String `tfsdk:"last_name"`
 	Email          types.String `tfsdk:"email"`
-	Phone          types.String `tfsdk:"phone"`
+	Phone          phoneValue   `tfsdk:"phone"`
 	Locale         types.String `tfsdk:"locale"`
 	Status         types.String `tfsdk:"status"`
 	OrganizationID types.String `tfsdk:"organization_id"`
@@ -86,10 +86,9 @@ func (r *UserResource) Schema(_ context.Context, _ resource.SchemaRequest, resp 
 				MarkdownDescription: "Last name.",
 			},
 			"phone": schema.StringAttribute{
+				CustomType:          phoneType{},
 				Optional:            true,
-				Computed:            true,
-				MarkdownDescription: "Phone number in E.164 format.",
-				PlanModifiers:       useStateForUnknown,
+				MarkdownDescription: "Phone number in E.164 format (e.g., `+1.2125551234`). The server may normalize the value (e.g., reformat punctuation); semantic equality is used so reformatted values that canonicalise to the same digits do not trigger drift.",
 			},
 			"locale": schema.StringAttribute{
 				Optional:            true,
@@ -150,7 +149,7 @@ func (r *UserResource) Create(ctx context.Context, req resource.CreateRequest, r
 		Email:     data.Email.ValueString(),
 		Locale:    data.Locale.ValueString(),
 	}
-	createReq.Phone = optionalStringPtr(data.Phone)
+	createReq.Phone = optionalStringPtr(data.Phone.StringValue)
 
 	user, err := r.client.Users.CreateUser(ctx, createReq)
 	if err != nil {
@@ -203,7 +202,7 @@ func (r *UserResource) Update(ctx context.Context, req resource.UpdateRequest, r
 		hasChange = true
 	}
 	if !plan.Phone.Equal(state.Phone) {
-		updateReq.Phone = optionalStringPtr(plan.Phone)
+		updateReq.Phone = optionalStringPtr(plan.Phone.StringValue)
 		hasChange = true
 	}
 	if !plan.Locale.Equal(state.Locale) {
@@ -263,7 +262,7 @@ func populateUserModel(data *UserResourceModel, u *models.User) {
 	data.Status = types.StringValue(string(u.Status))
 	data.OrganizationID = types.StringValue(string(u.OrganizationID))
 
-	data.Phone = stringPtrToValue(u.Phone)
+	data.Phone = phoneValue{StringValue: stringPtrToValue(u.Phone)}
 
 	if u.CreatedOn != nil {
 		data.CreatedOn = types.StringValue(u.CreatedOn.Format("2006-01-02T15:04:05Z07:00"))
