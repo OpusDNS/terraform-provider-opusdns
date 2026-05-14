@@ -315,7 +315,17 @@ func (r *DomainResource) Read(ctx context.Context, req resource.ReadRequest, res
 		return
 	}
 
-	domain, err := r.client.Domains.GetDomain(ctx, data.DomainID.ValueString())
+	domainID := data.DomainID.ValueString()
+	if domainID == "" {
+		resp.Diagnostics.AddError(
+			"Invalid domain state",
+			"The opusdns_domain resource has an empty `domain_id` in state, which prevents reading it from the API. "+
+				"Remove the resource from state with `terraform state rm` and re-import or recreate it.",
+		)
+		return
+	}
+
+	domain, err := r.client.Domains.GetDomain(ctx, domainID)
 	if err != nil {
 		if isNotFound(err) {
 			resp.State.RemoveResource(ctx)
@@ -334,6 +344,16 @@ func (r *DomainResource) Update(ctx context.Context, req resource.UpdateRequest,
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
 	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	domainID := state.DomainID.ValueString()
+	if domainID == "" {
+		resp.Diagnostics.AddError(
+			"Invalid domain state",
+			"The opusdns_domain resource has an empty `domain_id` in state, which prevents updating it. "+
+				"Remove the resource from state with `terraform state rm` and re-import or recreate it.",
+		)
 		return
 	}
 
@@ -379,14 +399,14 @@ func (r *DomainResource) Update(ctx context.Context, req resource.UpdateRequest,
 
 	var domain *models.Domain
 	if hasChange {
-		updated, err := r.client.Domains.UpdateDomain(ctx, state.DomainID.ValueString(), updateReq)
+		updated, err := r.client.Domains.UpdateDomain(ctx, domainID, updateReq)
 		if err != nil {
 			resp.Diagnostics.AddError("Error updating domain", formatAPIError(err))
 			return
 		}
 		domain = updated
 	} else {
-		current, err := r.client.Domains.GetDomain(ctx, state.DomainID.ValueString())
+		current, err := r.client.Domains.GetDomain(ctx, domainID)
 		if err != nil {
 			resp.Diagnostics.AddError("Error reading domain", formatAPIError(err))
 			return
@@ -405,7 +425,17 @@ func (r *DomainResource) Delete(ctx context.Context, req resource.DeleteRequest,
 		return
 	}
 
-	if err := r.client.Domains.DeleteDomain(ctx, data.DomainID.ValueString()); err != nil {
+	domainID := data.DomainID.ValueString()
+	if domainID == "" {
+		resp.Diagnostics.AddError(
+			"Invalid domain state",
+			"The opusdns_domain resource has an empty `domain_id` in state, which prevents deletion via the API. "+
+				"Remove the resource from state with `terraform state rm` and, if the domain still exists at OpusDNS, delete it manually or re-import then destroy.",
+		)
+		return
+	}
+
+	if err := r.client.Domains.DeleteDomain(ctx, domainID); err != nil {
 		if !isNotFound(err) {
 			resp.Diagnostics.AddError("Error deleting domain", formatAPIError(err))
 		}

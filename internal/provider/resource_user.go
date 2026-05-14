@@ -168,7 +168,17 @@ func (r *UserResource) Read(ctx context.Context, req resource.ReadRequest, resp 
 		return
 	}
 
-	user, err := r.client.Users.GetUser(ctx, models.UserID(data.UserID.ValueString()))
+	userIDStr := data.UserID.ValueString()
+	if userIDStr == "" {
+		resp.Diagnostics.AddError(
+			"Invalid user state",
+			"The opusdns_user resource has an empty `user_id` in state, which prevents reading it from the API. "+
+				"Remove the resource from state with `terraform state rm` and re-import or recreate it.",
+		)
+		return
+	}
+
+	user, err := r.client.Users.GetUser(ctx, models.UserID(userIDStr))
 	if err != nil {
 		if isNotFound(err) {
 			resp.State.RemoveResource(ctx)
@@ -187,6 +197,16 @@ func (r *UserResource) Update(ctx context.Context, req resource.UpdateRequest, r
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
 	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	userIDStr := state.UserID.ValueString()
+	if userIDStr == "" {
+		resp.Diagnostics.AddError(
+			"Invalid user state",
+			"The opusdns_user resource has an empty `user_id` in state, which prevents updating it. "+
+				"Remove the resource from state with `terraform state rm` and re-import or recreate it.",
+		)
 		return
 	}
 

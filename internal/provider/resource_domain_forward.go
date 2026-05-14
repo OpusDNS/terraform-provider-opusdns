@@ -185,7 +185,17 @@ func (r *DomainForwardResource) Read(ctx context.Context, req resource.ReadReque
 		return
 	}
 
-	df, err := r.client.DomainForwards.GetDomainForward(ctx, data.Hostname.ValueString())
+	hostname := data.Hostname.ValueString()
+	if hostname == "" {
+		resp.Diagnostics.AddError(
+			"Invalid domain forward state",
+			"The opusdns_domain_forward resource has an empty `hostname` in state, which prevents reading it from the API. "+
+				"Remove the resource from state with `terraform state rm` and re-import or recreate it.",
+		)
+		return
+	}
+
+	df, err := r.client.DomainForwards.GetDomainForward(ctx, hostname)
 	if err != nil {
 		if isNotFound(err) {
 			resp.State.RemoveResource(ctx)
@@ -210,6 +220,14 @@ func (r *DomainForwardResource) Update(ctx context.Context, req resource.UpdateR
 	}
 
 	hostname := state.Hostname.ValueString()
+	if hostname == "" {
+		resp.Diagnostics.AddError(
+			"Invalid domain forward state",
+			"The opusdns_domain_forward resource has an empty `hostname` in state, which prevents updating it. "+
+				"Remove the resource from state with `terraform state rm` and re-import or recreate it.",
+		)
+		return
+	}
 
 	if plan.Enabled.ValueBool() != state.Enabled.ValueBool() {
 		if plan.Enabled.ValueBool() {
@@ -284,7 +302,16 @@ func (r *DomainForwardResource) Delete(ctx context.Context, req resource.DeleteR
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	if err := r.client.DomainForwards.DeleteDomainForward(ctx, data.Hostname.ValueString()); err != nil {
+	hostname := data.Hostname.ValueString()
+	if hostname == "" {
+		resp.Diagnostics.AddError(
+			"Invalid domain forward state",
+			"The opusdns_domain_forward resource has an empty `hostname` in state, which prevents deletion via the API. "+
+				"Remove the resource from state with `terraform state rm` and, if the forward still exists at OpusDNS, delete it manually or re-import then destroy.",
+		)
+		return
+	}
+	if err := r.client.DomainForwards.DeleteDomainForward(ctx, hostname); err != nil {
 		if !isNotFound(err) {
 			resp.Diagnostics.AddError("Error deleting domain forward", formatAPIError(err))
 		}

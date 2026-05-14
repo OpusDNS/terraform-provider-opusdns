@@ -223,7 +223,17 @@ func (r *OrganizationResource) Read(ctx context.Context, req resource.ReadReques
 		return
 	}
 
-	org, err := r.client.Organizations.GetOrganization(ctx, models.OrganizationID(data.OrganizationID.ValueString()))
+	orgIDStr := data.OrganizationID.ValueString()
+	if orgIDStr == "" {
+		resp.Diagnostics.AddError(
+			"Invalid organization state",
+			"The opusdns_organization resource has an empty `organization_id` in state, which prevents reading it from the API. "+
+				"Remove the resource from state with `terraform state rm` and re-import or recreate it.",
+		)
+		return
+	}
+
+	org, err := r.client.Organizations.GetOrganization(ctx, models.OrganizationID(orgIDStr))
 	if err != nil {
 		if isNotFound(err) {
 			resp.State.RemoveResource(ctx)
@@ -242,6 +252,16 @@ func (r *OrganizationResource) Update(ctx context.Context, req resource.UpdateRe
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
 	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	orgIDStr := state.OrganizationID.ValueString()
+	if orgIDStr == "" {
+		resp.Diagnostics.AddError(
+			"Invalid organization state",
+			"The opusdns_organization resource has an empty `organization_id` in state, which prevents updating it. "+
+				"Remove the resource from state with `terraform state rm` and re-import or recreate it.",
+		)
 		return
 	}
 
@@ -300,14 +320,14 @@ func (r *OrganizationResource) Update(ctx context.Context, req resource.UpdateRe
 
 	var org *models.Organization
 	if hasChange {
-		updated, err := r.client.Organizations.UpdateOrganization(ctx, models.OrganizationID(plan.OrganizationID.ValueString()), updateReq)
+		updated, err := r.client.Organizations.UpdateOrganization(ctx, models.OrganizationID(orgIDStr), updateReq)
 		if err != nil {
 			resp.Diagnostics.AddError("Error updating organization", formatAPIError(err))
 			return
 		}
 		org = updated
 	} else {
-		current, err := r.client.Organizations.GetOrganization(ctx, models.OrganizationID(plan.OrganizationID.ValueString()))
+		current, err := r.client.Organizations.GetOrganization(ctx, models.OrganizationID(orgIDStr))
 		if err != nil {
 			resp.Diagnostics.AddError("Error reading organization", formatAPIError(err))
 			return
@@ -326,7 +346,17 @@ func (r *OrganizationResource) Delete(ctx context.Context, req resource.DeleteRe
 		return
 	}
 
-	if err := rawDeleteOrganization(ctx, r.client, models.OrganizationID(data.OrganizationID.ValueString())); err != nil {
+	orgIDStr := data.OrganizationID.ValueString()
+	if orgIDStr == "" {
+		resp.Diagnostics.AddError(
+			"Invalid organization state",
+			"The opusdns_organization resource has an empty `organization_id` in state, which prevents deletion via the API. "+
+				"Remove the resource from state with `terraform state rm` and, if the organization still exists at OpusDNS, delete it manually or re-import then destroy.",
+		)
+		return
+	}
+
+	if err := rawDeleteOrganization(ctx, r.client, models.OrganizationID(orgIDStr)); err != nil {
 		if !isNotFound(err) {
 			resp.Diagnostics.AddError("Error deleting organization", formatAPIError(err))
 		}
