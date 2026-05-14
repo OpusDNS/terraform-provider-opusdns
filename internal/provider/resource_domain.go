@@ -526,7 +526,7 @@ func nameserversAPIToList(ctx context.Context, ns []models.Nameserver) (types.Li
 			return types.ListNull(objType), diags
 		}
 		obj, d := types.ObjectValue(nameserverAttrTypes, map[string]attr.Value{
-			"hostname":     types.StringValue(n.Hostname),
+			"hostname":     types.StringValue(trimTrailingDot(n.Hostname)),
 			"ip_addresses": ipList,
 		})
 		diags.Append(d...)
