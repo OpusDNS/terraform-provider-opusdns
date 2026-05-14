@@ -206,7 +206,7 @@ func (d *DNSRecordsDataSource) Read(ctx context.Context, req datasource.ReadRequ
 func rrsetToObjectValue(rr models.RRSet, zoneName string) (attr.Value, diag.Diagnostics) {
 	rdatas := make([]attr.Value, len(rr.Records))
 	for i, r := range rr.Records {
-		rdatas[i] = types.StringValue(r.RData)
+		rdatas[i] = types.StringValue(normalizeRData(string(rr.Type), r.RData))
 	}
 	rdataList, diags := types.ListValue(types.StringType, rdatas)
 	if diags.HasError() {

@@ -131,7 +131,7 @@ func (d *DNSRecordDataSource) Read(ctx context.Context, req datasource.ReadReque
 
 	rdatas := make([]attr.Value, len(rrset.Records))
 	for i, r := range rrset.Records {
-		rdatas[i] = types.StringValue(r.RData)
+		rdatas[i] = types.StringValue(normalizeRData(string(rrset.Type), r.RData))
 	}
 	recordList, diags := types.ListValue(types.StringType, rdatas)
 	resp.Diagnostics.Append(diags...)

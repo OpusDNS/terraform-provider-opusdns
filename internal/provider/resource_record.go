@@ -156,7 +156,7 @@ func (r *RecordResource) Read(ctx context.Context, req resource.ReadRequest, res
 
 	rdatas := make([]string, len(rrset.Records))
 	for i, r := range rrset.Records {
-		rdatas[i] = r.RData
+		rdatas[i] = normalizeRData(string(rrset.Type), r.RData)
 	}
 
 	recordList, diags := types.ListValueFrom(ctx, types.StringType, rdatas)
@@ -252,7 +252,7 @@ func (r *RecordResource) ImportState(ctx context.Context, req resource.ImportSta
 
 	rdatas := make([]string, len(rrset.Records))
 	for i, rec := range rrset.Records {
-		rdatas[i] = rec.RData
+		rdatas[i] = normalizeRData(string(rrset.Type), rec.RData)
 	}
 
 	recordList, diags := types.ListValueFrom(ctx, types.StringType, rdatas)
