@@ -238,6 +238,7 @@ func (p *OpusDNSProvider) Resources(_ context.Context) []func() resource.Resourc
 		NewTagResource,
 		NewHostResource,
 		NewParkingResource,
+		NewRegistrarCredentialResource,
 	}
 }
 
@@ -268,6 +269,8 @@ func (p *OpusDNSProvider) DataSources(_ context.Context) []func() datasource.Dat
 		NewHostDataSource,
 		NewParkingDataSource,
 		NewParkingsDataSource,
+		NewRegistrarCredentialDataSource,
+		NewRegistrarCredentialsDataSource,
 	}
 }
 
