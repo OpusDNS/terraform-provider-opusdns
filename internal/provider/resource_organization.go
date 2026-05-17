@@ -7,6 +7,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/listplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
@@ -46,6 +47,19 @@ type OrganizationResourceModel struct {
 	Status               types.String `tfsdk:"status"`
 	TaxRate              types.String `tfsdk:"tax_rate"`
 	CreatedOn            types.String `tfsdk:"created_on"`
+	Users                types.List   `tfsdk:"users"`
+}
+
+// organizationUserModel is the Go-side representation of a single nested
+// `users` element used when decoding the planned list via ElementsAs.
+type organizationUserModel struct {
+	Username  types.String `tfsdk:"username"`
+	FirstName types.String `tfsdk:"first_name"`
+	LastName  types.String `tfsdk:"last_name"`
+	Email     types.String `tfsdk:"email"`
+	Locale    types.String `tfsdk:"locale"`
+	Phone     types.String `tfsdk:"phone"`
+	Password  types.String `tfsdk:"password"`
 }
 
 // NewOrganizationResource returns a new OrganizationResource.
@@ -163,6 +177,49 @@ func (r *OrganizationResource) Schema(_ context.Context, _ resource.SchemaReques
 				MarkdownDescription: "RFC3339 timestamp the organization was created.",
 				PlanModifiers:       useStateForUnknown,
 			},
+			"users": schema.ListNestedAttribute{
+				Optional: true,
+				MarkdownDescription: "Initial users to provision atomically with the organization (POST `/v1/organizations` `users` array). " +
+					"Create-only: changes to this list after the organization exists force replacement. " +
+					"For ongoing user management use the `opusdns_user` resource. " +
+					"An empty or omitted list creates the organization with no initial users.",
+				PlanModifiers: []planmodifier.List{
+					listplanmodifier.RequiresReplace(),
+				},
+				NestedObject: schema.NestedAttributeObject{
+					Attributes: map[string]schema.Attribute{
+						"username": schema.StringAttribute{
+							Required:            true,
+							MarkdownDescription: "Unique username for the user.",
+						},
+						"first_name": schema.StringAttribute{
+							Required:            true,
+							MarkdownDescription: "First name.",
+						},
+						"last_name": schema.StringAttribute{
+							Required:            true,
+							MarkdownDescription: "Last name.",
+						},
+						"email": schema.StringAttribute{
+							Required:            true,
+							MarkdownDescription: "Email address.",
+						},
+						"locale": schema.StringAttribute{
+							Required:            true,
+							MarkdownDescription: "User locale (e.g. `en-US`).",
+						},
+						"phone": schema.StringAttribute{
+							Optional:            true,
+							MarkdownDescription: "Phone number in E.164 international format (e.g. `+1.2125551234`).",
+						},
+						"password": schema.StringAttribute{
+							Optional:            true,
+							Sensitive:           true,
+							MarkdownDescription: "Plaintext password for the user; hashed server-side at creation.",
+						},
+					},
+				},
+			},
 		},
 	}
 }
@@ -205,6 +262,30 @@ func (r *OrganizationResource) Create(ctx context.Context, req resource.CreateRe
 	addOptionalString(body, "tax_id_type", data.TaxIDType)
 	addOptionalString(body, "currency", data.Currency)
 	addOptionalString(body, "default_locale", data.DefaultLocale)
+
+	// Convert the `users` list (if any) to the JSON shape the API expects.
+	// Mirrors models.UserCreate at api/common/models/account/user.py:71.
+	if !data.Users.IsNull() && !data.Users.IsUnknown() {
+		var users []organizationUserModel
+		resp.Diagnostics.Append(data.Users.ElementsAs(ctx, &users, false)...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
+		usersBody := make([]map[string]interface{}, 0, len(users))
+		for _, u := range users {
+			entry := map[string]interface{}{
+				"username":   u.Username.ValueString(),
+				"first_name": u.FirstName.ValueString(),
+				"last_name":  u.LastName.ValueString(),
+				"email":      u.Email.ValueString(),
+				"locale":     u.Locale.ValueString(),
+			}
+			addOptionalString(entry, "phone", u.Phone)
+			addOptionalString(entry, "password", u.Password)
+			usersBody = append(usersBody, entry)
+		}
+		body["users"] = usersBody
+	}
 
 	org, err := rawCreateOrganization(ctx, r.client, body)
 	if err != nil {
