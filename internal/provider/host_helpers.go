@@ -3,23 +3,8 @@ package provider
 import (
 	"context"
 
-	"github.com/hashicorp/terraform-plugin-framework/diag"
-	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/opusdns/opusdns-go-client/opusdns"
 )
-
-// listToStringSlice extracts a []string from a types.List of StringType.
-// Returns an empty slice (and no diagnostics) when the list is null or
-// unknown so callers can pass the result straight to a JSON body.
-func listToStringSlice(ctx context.Context, l types.List) ([]string, diag.Diagnostics) {
-	var diags diag.Diagnostics
-	if l.IsNull() || l.IsUnknown() {
-		return []string{}, diags
-	}
-	out := make([]string, 0, len(l.Elements()))
-	diags.Append(l.ElementsAs(ctx, &out, false)...)
-	return out, diags
-}
 
 // rawCreateHost wraps POST /v1/hosts.
 // The SDK at v1.0.9 has no typed Hosts service, so we issue the call directly
