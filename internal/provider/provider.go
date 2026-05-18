@@ -233,6 +233,7 @@ func (p *OpusDNSProvider) Resources(_ context.Context) []func() resource.Resourc
 		NewDomainForwardResource,
 		NewOrganizationResource,
 		NewUserResource,
+		NewUserRoleAssignmentResource,
 		NewDomainResource,
 		NewDomainDNSSECResource,
 		NewTagResource,
