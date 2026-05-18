@@ -47,6 +47,17 @@ The provider authenticates via the OpusDNS `/v1/auth` OAuth2 endpoints. Three mo
 | `password`      | string | Modes 2, 3           | `OPUSDNS_PASSWORD`      | OpusDNS password for the password grant. |
 | `api_endpoint`  | string | No                   | `OPUSDNS_API_ENDPOINT`  | Override the API endpoint (defaults to `https://api.opusdns.com`). |
 
+#### Generating API credentials
+
+To use Mode 1 (the recommended path), generate a pre-minted client secret from the OpusDNS dashboard:
+
+1. Log in to your OpusDNS account at <https://app.opusdns.com>.
+2. Navigate to **Developer** > **API Credentials**.
+3. Create a new credential and copy the generated `client_secret`. Your organization id (`organization_...`) is shown in the same view.
+4. Supply the values to the provider via `org_id` / `client_secret` (or the `OPUSDNS_ORG_ID` / `OPUSDNS_CLIENT_SECRET` environment variables).
+
+The `client_secret` is shown only once at creation — store it in a secret manager. Treat it like a password; it grants full API access for the organization.
+
 ## Resources
 
 ### `opusdns_zone`
