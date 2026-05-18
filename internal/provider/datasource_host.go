@@ -3,10 +3,10 @@ package provider
 import (
 	"context"
 	"fmt"
-	"sort"
 	"time"
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/datasourcevalidator"
+	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/path"
@@ -31,7 +31,7 @@ type HostDataSourceModel struct {
 	ID          types.String `tfsdk:"id"`
 	HostID      types.String `tfsdk:"host_id"`
 	Hostname    types.String `tfsdk:"hostname"`
-	IPAddresses types.List   `tfsdk:"ip_addresses"`
+	IPAddresses types.Set    `tfsdk:"ip_addresses"`
 	CreatedOn   types.String `tfsdk:"created_on"`
 	UpdatedOn   types.String `tfsdk:"updated_on"`
 }
@@ -53,10 +53,10 @@ func (d *HostDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, r
 			"id":       schema.StringAttribute{Computed: true, MarkdownDescription: "Mirrors `host_id`."},
 			"host_id":  schema.StringAttribute{Optional: true, Computed: true, MarkdownDescription: "Host id (e.g. `host_01j...`). Mutually exclusive with `hostname`."},
 			"hostname": schema.StringAttribute{Optional: true, Computed: true, MarkdownDescription: "Fully-qualified hostname of the host object. Mutually exclusive with `host_id`."},
-			"ip_addresses": schema.ListAttribute{
+			"ip_addresses": schema.SetAttribute{
 				Computed:            true,
 				ElementType:         types.StringType,
-				MarkdownDescription: "IPv4/IPv6 addresses bound to the host. Sorted lexicographically for deterministic output.",
+				MarkdownDescription: "IPv4/IPv6 addresses bound to the host. Modelled as a set; order is not significant.",
 			},
 			"created_on": schema.StringAttribute{Computed: true},
 			"updated_on": schema.StringAttribute{Computed: true},
@@ -109,9 +109,11 @@ func (d *HostDataSource) Read(ctx context.Context, req datasource.ReadRequest, r
 		return
 	}
 
-	ips := append([]string(nil), host.IPAddresses...)
-	sort.Strings(ips)
-	ipList, diags := stringSliceToList(ips)
+	values := make([]attr.Value, len(host.IPAddresses))
+	for i, ip := range host.IPAddresses {
+		values[i] = types.StringValue(ip)
+	}
+	ipSet, diags := types.SetValue(types.StringType, values)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -120,7 +122,7 @@ func (d *HostDataSource) Read(ctx context.Context, req datasource.ReadRequest, r
 	data.ID = types.StringValue(host.HostID)
 	data.HostID = types.StringValue(host.HostID)
 	data.Hostname = types.StringValue(host.Hostname)
-	data.IPAddresses = ipList
+	data.IPAddresses = ipSet
 	data.CreatedOn = types.StringValue(host.CreatedOn.Format(time.RFC3339))
 	data.UpdatedOn = types.StringValue(host.UpdatedOn.Format(time.RFC3339))
 

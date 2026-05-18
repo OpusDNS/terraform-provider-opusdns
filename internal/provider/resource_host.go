@@ -3,10 +3,9 @@ package provider
 import (
 	"context"
 	"fmt"
-	"sort"
 	"time"
 
-	"github.com/hashicorp/terraform-plugin-framework-validators/listvalidator"
+	"github.com/hashicorp/terraform-plugin-framework-validators/setvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
@@ -44,7 +43,7 @@ type HostResourceModel struct {
 	ID          types.String `tfsdk:"id"`
 	HostID      types.String `tfsdk:"host_id"`
 	Hostname    types.String `tfsdk:"hostname"`
-	IPAddresses types.List   `tfsdk:"ip_addresses"`
+	IPAddresses types.Set    `tfsdk:"ip_addresses"`
 	CreatedOn   types.String `tfsdk:"created_on"`
 	UpdatedOn   types.String `tfsdk:"updated_on"`
 }
@@ -92,12 +91,12 @@ func (r *HostResource) Schema(_ context.Context, _ resource.SchemaRequest, resp 
 					stringplanmodifier.RequiresReplace(),
 				},
 			},
-			"ip_addresses": schema.ListAttribute{
+			"ip_addresses": schema.SetAttribute{
 				Required:            true,
 				ElementType:         types.StringType,
-				MarkdownDescription: "List of IPv4 or IPv6 addresses for the host object. At least one address is required.",
-				Validators: []validator.List{
-					listvalidator.SizeAtLeast(1),
+				MarkdownDescription: "Set of IPv4 or IPv6 addresses for the host object. At least one address is required. Order is not significant; the API has no canonical order for `ip_addresses`.",
+				Validators: []validator.Set{
+					setvalidator.SizeAtLeast(1),
 				},
 			},
 			"created_on": schema.StringAttribute{
@@ -135,7 +134,7 @@ func (r *HostResource) Create(ctx context.Context, req resource.CreateRequest, r
 		return
 	}
 
-	ips, diags := listToStringSlice(ctx, data.IPAddresses)
+	ips, diags := setToStringSlice(ctx, data.IPAddresses)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -208,19 +207,14 @@ func (r *HostResource) Update(ctx context.Context, req resource.UpdateRequest, r
 		return
 	}
 
-	planIPs, diags := listToStringSlice(ctx, plan.IPAddresses)
-	resp.Diagnostics.Append(diags...)
-	if resp.Diagnostics.HasError() {
-		return
-	}
-	stateIPs, diags := listToStringSlice(ctx, state.IPAddresses)
+	planIPs, diags := setToStringSlice(ctx, plan.IPAddresses)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
 	var host *hostAPIResponse
-	if !ipSetsEqual(planIPs, stateIPs) {
+	if !plan.IPAddresses.Equal(state.IPAddresses) {
 		body := map[string]interface{}{"ip_addresses": planIPs}
 		updated, err := rawUpdateHost(ctx, r.client, hostID, body)
 		if err != nil {
@@ -278,37 +272,17 @@ func populateHostModel(_ context.Context, data *HostResourceModel, h *hostAPIRes
 	data.HostID = types.StringValue(h.HostID)
 	data.Hostname = types.StringValue(h.Hostname)
 
-	// Sort IPs for deterministic state ordering so plan-vs-state diffs do not
-	// flap when the API returns addresses in a different order than supplied.
-	ips := append([]string(nil), h.IPAddresses...)
-	sort.Strings(ips)
-	values := make([]attr.Value, len(ips))
-	for i, ip := range ips {
+	// ip_addresses is modelled as a set: order is not significant to the API
+	// and using a set lets the framework handle equality without provider-side
+	// sorting (which would otherwise violate plan/state consistency).
+	values := make([]attr.Value, len(h.IPAddresses))
+	for i, ip := range h.IPAddresses {
 		values[i] = types.StringValue(ip)
 	}
-	list, d := types.ListValue(types.StringType, values)
+	set, d := types.SetValue(types.StringType, values)
 	diags.Append(d...)
-	data.IPAddresses = list
+	data.IPAddresses = set
 
 	data.CreatedOn = types.StringValue(h.CreatedOn.Format(time.RFC3339))
 	data.UpdatedOn = types.StringValue(h.UpdatedOn.Format(time.RFC3339))
-}
-
-// ipSetsEqual reports whether two IP lists contain the same addresses,
-// independent of input ordering. The API has no canonical order for
-// `ip_addresses`, so plan vs state membership is what matters.
-func ipSetsEqual(a, b []string) bool {
-	if len(a) != len(b) {
-		return false
-	}
-	sa := append([]string(nil), a...)
-	sb := append([]string(nil), b...)
-	sort.Strings(sa)
-	sort.Strings(sb)
-	for i := range sa {
-		if sa[i] != sb[i] {
-			return false
-		}
-	}
-	return true
 }
