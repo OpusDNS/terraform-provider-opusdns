@@ -251,6 +251,7 @@ func (p *OpusDNSProvider) DataSources(_ context.Context) []func() datasource.Dat
 		NewOrganizationsDataSource,
 		NewUserDataSource,
 		NewUsersDataSource,
+		NewUserRoleAssignmentDataSource,
 		NewContactDataSource,
 		NewContactsDataSource,
 		NewDomainDataSource,
