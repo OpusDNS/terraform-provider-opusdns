@@ -60,12 +60,12 @@ var domainCheckPremiumPriceAttrTypes = map[string]attr.Type{
 }
 
 var domainCheckResultAttrTypes = map[string]attr.Type{
-	"domain":           types.StringType,
-	"available":        types.BoolType,
-	"reason":           types.StringType,
-	"is_premium":       types.BoolType,
-	"claims_key":       types.StringType,
-	"premium_pricing":  types.ListType{ElemType: types.ObjectType{AttrTypes: domainCheckPremiumPriceAttrTypes}},
+	"domain":          types.StringType,
+	"available":       types.BoolType,
+	"reason":          types.StringType,
+	"is_premium":      types.BoolType,
+	"claims_key":      types.StringType,
+	"premium_pricing": types.ListType{ElemType: types.ObjectType{AttrTypes: domainCheckPremiumPriceAttrTypes}},
 }
 
 func NewDomainCheckDataSource() datasource.DataSource {

@@ -21,8 +21,8 @@ type OrganizationIPRestrictionsDataSource struct {
 }
 
 type OrganizationIPRestrictionsDataSourceModel struct {
-	ID              types.String `tfsdk:"id"`
-	IPRestrictions  types.List   `tfsdk:"ip_restrictions"`
+	ID             types.String `tfsdk:"id"`
+	IPRestrictions types.List   `tfsdk:"ip_restrictions"`
 }
 
 var ipRestrictionItemAttrTypes = map[string]attr.Type{

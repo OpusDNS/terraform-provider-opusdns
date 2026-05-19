@@ -126,4 +126,3 @@ func extractPermissionNames(raw interface{}) []string {
 	}
 	return []string{}
 }
-

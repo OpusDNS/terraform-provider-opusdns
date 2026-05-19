@@ -21,10 +21,10 @@ type ContactAttributeSetsDataSource struct {
 }
 
 type ContactAttributeSetsDataSourceModel struct {
-	ID                    types.String `tfsdk:"id"`
-	TLD                   types.String `tfsdk:"tld"`
-	Label                 types.String `tfsdk:"label"`
-	ContactAttributeSets  types.List   `tfsdk:"contact_attribute_sets"`
+	ID                   types.String `tfsdk:"id"`
+	TLD                  types.String `tfsdk:"tld"`
+	Label                types.String `tfsdk:"label"`
+	ContactAttributeSets types.List   `tfsdk:"contact_attribute_sets"`
 }
 
 var contactAttributeSetItemAttrTypes = map[string]attr.Type{
