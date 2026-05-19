@@ -47,6 +47,17 @@ The provider authenticates via the OpusDNS `/v1/auth` OAuth2 endpoints. Three mo
 | `password`      | string | Modes 2, 3           | `OPUSDNS_PASSWORD`      | OpusDNS password for the password grant. |
 | `api_endpoint`  | string | No                   | `OPUSDNS_API_ENDPOINT`  | Override the API endpoint (defaults to `https://api.opusdns.com`). |
 
+#### Generating API credentials
+
+To use Mode 1 (the recommended path), generate a pre-minted client secret from the OpusDNS dashboard:
+
+1. Log in to your OpusDNS account at <https://app.opusdns.com>.
+2. Navigate to **Developer** > **API Credentials**.
+3. Create a new credential and copy the generated `client_secret`. Your organization id (`organization_...`) is shown in the same view.
+4. Supply the values to the provider via `org_id` / `client_secret` (or the `OPUSDNS_ORG_ID` / `OPUSDNS_CLIENT_SECRET` environment variables).
+
+The `client_secret` is shown only once at creation — store it in a secret manager. Treat it like a password; it grants full API access for the organization.
+
 ## Resources
 
 ### `opusdns_zone`
@@ -196,6 +207,8 @@ resource "opusdns_user" "alice" {
 
 **Import:** `terraform import opusdns_user.alice <user_id>`
 
+---
+
 ### `opusdns_tag`
 
 Manages a tag (`/v1/tags`). Tags categorize resources (`DOMAIN`, `CONTACT`, or `ZONE`). The `type` field is immutable — changing it forces replacement; `label`, `color`, and `description` are updatable in place.
@@ -210,6 +223,143 @@ resource "opusdns_tag" "production" {
 ```
 
 **Import:** `terraform import opusdns_tag.production <tag_id>`
+
+---
+
+### `opusdns_domain`
+
+Registers and manages a domain (`/v1/domains`). `contacts`, `nameservers`, `renewal_mode`, and `transfer_lock` are updatable in place; all other inputs (name, period, `create_zone`, `auth_code`) force replacement.
+
+```hcl
+resource "opusdns_domain" "example" {
+  name = "example.com"
+
+  contacts = {
+    registrant = [opusdns_contact.admin.id]
+    admin      = [opusdns_contact.admin.id]
+    tech       = [opusdns_contact.admin.id]
+    billing    = [opusdns_contact.admin.id]
+  }
+
+  period_value  = 1
+  period_unit   = "y"
+  create_zone   = true
+  renewal_mode  = "renew"
+  transfer_lock = true
+
+  nameservers = [
+    { hostname = "ns1.opusdns.com" },
+    { hostname = "ns2.opusdns.com" },
+  ]
+}
+```
+
+**Import:** `terraform import opusdns_domain.example <domain_id>`
+
+---
+
+### `opusdns_domain_dnssec`
+
+Manages DNSSEC configuration for a domain. Two mutually exclusive modes: registry-managed (`enabled = true`, OpusDNS generates and publishes DS records) or bring-your-own (`enabled = false` with explicit `records`).
+
+```hcl
+# Registry-managed
+resource "opusdns_domain_dnssec" "example" {
+  domain_ref = "example.com"
+  enabled    = true
+}
+
+# Bring-your-own DS records
+resource "opusdns_domain_dnssec" "byo" {
+  domain_ref = "example.com"
+  enabled    = false
+
+  records = [
+    {
+      record_type = "ds_data"
+      algorithm   = 13
+      digest_type = 2
+      key_tag     = 12345
+      digest      = "ABCDEF0123456789..."
+    }
+  ]
+}
+```
+
+**Import:** `terraform import opusdns_domain_dnssec.example example.com` (accepts domain id or name; `enabled` defaults to `false` on import — set it in config to match registry-managed mode).
+
+---
+
+### `opusdns_host`
+
+Manages a host (glue) object (`/v1/hosts`) binding an FQDN to one or more IP addresses. `hostname` is immutable.
+
+```hcl
+resource "opusdns_host" "ns1" {
+  hostname     = "ns1.example.com"
+  ip_addresses = ["192.0.2.1", "2001:db8::1"]
+}
+```
+
+**Import:** `terraform import opusdns_host.ns1 <host_id>` (also accepts the hostname, e.g. `ns1.example.com`).
+
+---
+
+### `opusdns_parking`
+
+Manages a parking entry (`/v1/parking`) attaching an ad-serving placeholder page to a domain. The org must have accepted the parking program agreement (`POST /v1/parking/signup`) before resources can be created. `domain` is immutable.
+
+```hcl
+resource "opusdns_parking" "example" {
+  domain  = "example.com"
+  enabled = true
+}
+```
+
+**Import:** `terraform import opusdns_parking.example <parking_id>` (also accepts the domain name, e.g. `example.com`).
+
+---
+
+### `opusdns_registrar_credential`
+
+Manages a third-party registrar credential (`/v1/connect/registrars`) used by OpusDNS Connect to act on the org's behalf at the registrar. `name`, `registrar`, and `credentials` are all immutable. The `credentials` payload is write-only — the API never returns it, so drift cannot be detected.
+
+```hcl
+resource "opusdns_registrar_credential" "internetx" {
+  name      = "InternetX Production"
+  registrar = "INTERNETX"
+
+  credentials = {
+    username = "acme"
+    password = var.internetx_password
+    # additional registrar-specific keys as required
+  }
+}
+```
+
+**Import:** `terraform import opusdns_registrar_credential.internetx <registrar_credential_id>` (credentials must be re-supplied in config after import).
+
+---
+
+### `opusdns_user_role_assignment`
+
+Manages the full set of roles assigned to a user (`PATCH /v1/users/{user_id}/roles`). The configured `roles` set is treated as the desired total; the provider diffs against current state and issues minimal add/remove batches. `user_id` is immutable.
+
+```hcl
+resource "opusdns_user_role_assignment" "alice" {
+  user_id = opusdns_user.alice.id
+
+  roles = [
+    "member",
+    "domain_manager",
+    "contact_manager",
+  ]
+}
+```
+
+Allowed roles: `admin`, `api_admin`, `billing_manager`, `chat_manager`, `cms_content_editor`, `contact_manager`, `domain_forward_manager`, `domain_manager`, `email_forward_manager`, `events_manager`, `host_manager`, `member`, `organization_manager`, `product_manager`, `registrar_credential_manager`, `reseller_manager`.
+
+**Import:** `terraform import opusdns_user_role_assignment.alice <user_id>`
 
 ## Data Sources
 
@@ -304,6 +454,246 @@ output "tag_labels" {
 }
 ```
 
+### `data.opusdns_user_role_assignment`
+
+Fetches the set of provider-managed roles currently assigned to a user (`GET /v1/users/{user_id}/roles`). Implicit roles such as `accepted_tos`, `owner`, and `self` are filtered out.
+
+```hcl
+data "opusdns_user_role_assignment" "alice" {
+  user_id = opusdns_user.alice.id
+}
+```
+
+### `data.opusdns_contact`
+
+Fetches a single contact by id (`GET /v1/contacts/{contact_id}`).
+
+```hcl
+data "opusdns_contact" "admin" {
+  contact_id = "contact_01jxxxxxxxxxxxxxxxxxxxxxxx"
+}
+```
+
+### `data.opusdns_contacts`
+
+Lists contacts in the authenticated caller's organization (`GET /v1/contacts`). Optional `search`, `first_name`, `last_name`, `email`, `country`, and `verified` filters narrow the server-side query.
+
+```hcl
+data "opusdns_contacts" "verified_us" {
+  country  = "US"
+  verified = true
+}
+
+output "contact_emails" {
+  value = [for c in data.opusdns_contacts.verified_us.contacts : c.email]
+}
+```
+
+### `data.opusdns_domain`
+
+Fetches a single domain (`GET /v1/domains/{ref}`). `domain_ref` may be either a `domain_...` id or an FQDN.
+
+```hcl
+data "opusdns_domain" "example" {
+  domain_ref = "example.com"
+}
+```
+
+### `data.opusdns_domains`
+
+Lists domains in the authenticated caller's organization (`GET /v1/domains`). Optional `search`, `name`, `tld`, `sld`, `status`, `renewal_mode`, `transfer_lock`, and `is_premium` filters narrow the server-side query.
+
+```hcl
+data "opusdns_domains" "com" {
+  tld = "com"
+}
+
+output "domain_names" {
+  value = [for d in data.opusdns_domains.com.domains : d.name]
+}
+```
+
+### `data.opusdns_domain_dnssec`
+
+Reads the DNSSEC configuration for a domain. `domain_ref` may be either a `domain_...` id or an FQDN.
+
+```hcl
+data "opusdns_domain_dnssec" "example" {
+  domain_ref = "example.com"
+}
+```
+
+### `data.opusdns_domain_availability`
+
+Checks whether a domain is available for registration (`GET /v1/availability`). Useful as a precondition for `opusdns_domain`.
+
+```hcl
+data "opusdns_domain_availability" "example" {
+  domain = "example.com"
+}
+
+output "available" {
+  value = data.opusdns_domain_availability.example.is_available
+}
+```
+
+### `data.opusdns_record`
+
+Reads a single DNS record set (RRSet) by zone, name, and type.
+
+```hcl
+data "opusdns_record" "www" {
+  zone_name = "example.com"
+  name      = "www"
+  type      = "A"
+}
+```
+
+### `data.opusdns_records`
+
+Lists DNS record sets (RRSets) in a zone. Optional `name`, `type`, or `types_in` filters narrow the result (filtering is performed client-side; `type` and `types_in` are mutually exclusive).
+
+```hcl
+data "opusdns_records" "mx_records" {
+  zone_name = "example.com"
+  type      = "MX"
+}
+
+output "mx" {
+  value = [for r in data.opusdns_records.mx_records.records : r.records]
+}
+```
+
+### `data.opusdns_email_forward`
+
+Fetches a single email forward by id (`GET /v1/email-forwards/{id}`).
+
+```hcl
+data "opusdns_email_forward" "example" {
+  email_forward_id = "email_forward_01jxxxxxxxxxxxxxxxxxxxxxxx"
+}
+```
+
+### `data.opusdns_email_forwards`
+
+Lists email forwards configured for a zone (`GET /v1/zones/{zone}/email-forwards`).
+
+```hcl
+data "opusdns_email_forwards" "example" {
+  zone_name = "example.com"
+}
+
+output "forward_hostnames" {
+  value = [for f in data.opusdns_email_forwards.example.email_forwards : f.hostname]
+}
+```
+
+### `data.opusdns_domain_forward`
+
+Fetches a single domain (HTTP) forward by hostname (`GET /v1/domain-forwards/{hostname}`).
+
+```hcl
+data "opusdns_domain_forward" "www" {
+  hostname = "www.example.com"
+}
+```
+
+### `data.opusdns_domain_forwards`
+
+Lists domain forwards configured for a zone (`GET /v1/zones/{zone}/domain-forwards`).
+
+```hcl
+data "opusdns_domain_forwards" "example" {
+  zone_name = "example.com"
+}
+
+output "forward_hostnames" {
+  value = [for f in data.opusdns_domain_forwards.example.domain_forwards : f.hostname]
+}
+```
+
+### `data.opusdns_host`
+
+Reads a single host (glue) object (`GET /v1/hosts/{ref}`). Exactly one of `host_id` or `hostname` must be supplied.
+
+```hcl
+data "opusdns_host" "ns1" {
+  hostname = "ns1.example.com"
+}
+```
+
+### `data.opusdns_parking`
+
+Reads a single parking entry (`GET /v1/parking/{ref}`). Exactly one of `parking_id` or `domain` must be supplied.
+
+```hcl
+data "opusdns_parking" "example" {
+  domain = "example.com"
+}
+```
+
+### `data.opusdns_parkings`
+
+Lists parking entries in the authenticated caller's organization (`GET /v1/parking`). Optional `search`, `enabled`, `compliance_status`, `sort_by`, and `sort_order` filters narrow the result.
+
+```hcl
+data "opusdns_parkings" "approved" {
+  compliance_status = "approved"
+}
+
+output "parked_domains" {
+  value = [for p in data.opusdns_parkings.approved.parkings : p.domain]
+}
+```
+
+### `data.opusdns_registrar_credential`
+
+Reads metadata for a single registrar credential (`GET /v1/connect/registrars/{registrar_credential_id}`). The credential payload itself is never returned by the API.
+
+```hcl
+data "opusdns_registrar_credential" "internetx" {
+  registrar_credential_id = "registrar_credential_01jxxxxxxxxxxxxxxxxxxxxxxx"
+}
+```
+
+### `data.opusdns_registrar_credentials`
+
+Lists registrar credentials in the authenticated caller's organization (`GET /v1/connect/registrars`). Optional `registrar` filter narrows by provider (`INTERNETX`, `MONIKER`, `DOMAIN_BESTELLSYSTEM`, `CENTRALNIC`, `OPUSDNS`, `ENOM`).
+
+```hcl
+data "opusdns_registrar_credentials" "internetx" {
+  registrar = "INTERNETX"
+}
+
+output "credential_names" {
+  value = [for c in data.opusdns_registrar_credentials.internetx.registrar_credentials : c.name]
+}
+```
+
+### `data.opusdns_tld`
+
+Fetches detailed information for a single TLD (`GET /v1/tlds/{tld}`), including pricing, restrictions, contact/nameserver requirements, and launch phases.
+
+```hcl
+data "opusdns_tld" "com" {
+  name = "com"
+}
+```
+
+### `data.opusdns_tlds`
+
+Lists all TLDs supported by the registry (flat fields only; use `data.opusdns_tld` for rich details). Optional `search`, `type`, `available`, `registration_enabled`, and `dnssec_supported` filters narrow the result.
+
+```hcl
+data "opusdns_tlds" "dnssec_enabled" {
+  dnssec_supported = true
+}
+
+output "tld_names" {
+  value = [for t in data.opusdns_tlds.dnssec_enabled.tlds : t.name]
+}
+```
+
 ## Building from Source
 
 ```sh
@@ -340,10 +730,8 @@ The fastest way to exercise the provider end-to-end while you iterate is:
 cd ../api
 # Follow the dev-resources README to start the API stack (typically
 # `tilt up` or `docker compose up`). The API will be reachable at
-# http://api.opusdns.local once ready.
+# https://api.opusdns.com once ready.
 ```
-
-The auth flow you're targeting is documented in `../api/dev-resources/neovim-api-requests/api-key-connect-test.http`.
 
 ### 2. Build & install the provider
 
@@ -355,16 +743,16 @@ Confirm `~/.terraformrc` contains the `dev_overrides` block above pointing at `$
 
 ### 3. Export credentials
 
-The provider reads `OPUSDNS_*` env vars when the matching attribute is null. For local development against `api.opusdns.local`:
+The provider reads `OPUSDNS_*` env vars when the matching attribute is null. For local development against `api.opusdns.com`:
 
 ```sh
 # Option A: pre-minted client credentials (preferred)
-export OPUSDNS_API_ENDPOINT="http://api.opusdns.local"
+export OPUSDNS_API_ENDPOINT="https://api.opusdns.com"
 export OPUSDNS_ORG_ID="organization_01jnh0v027fz2r0pcbavf9qtyy"
 export OPUSDNS_CLIENT_SECRET="cs_xxx"      # from POST /v1/auth/client_credentials
 
 # Option B: full username/password flow (mints a fresh api key per run)
-export OPUSDNS_API_ENDPOINT="http://api.opusdns.local"
+export OPUSDNS_API_ENDPOINT="https://api.opusdns.com"
 export OPUSDNS_ORG_ID="organization_01jnh0v027fz2r0pcbavf9qtyy"
 export OPUSDNS_USERNAME="example_user"
 export OPUSDNS_PASSWORD="securepassword123"
@@ -373,7 +761,7 @@ export OPUSDNS_PASSWORD="securepassword123"
 If you prefer to drive everything through `TF_VAR_*` (e.g. when committing Terraform configs that consume `var.opusdns_*` like [`examples/provider/provider.tf`](examples/provider/provider.tf)):
 
 ```sh
-export TF_VAR_opusdns_api_endpoint="http://api.opusdns.local"
+export TF_VAR_opusdns_api_endpoint="https://api.opusdns.com"
 export TF_VAR_opusdns_org_id="organization_01jnh0v027fz2r0pcbavf9qtyy"
 export TF_VAR_opusdns_client_secret="cs_xxx"
 ```

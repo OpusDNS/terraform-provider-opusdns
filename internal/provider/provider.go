@@ -28,9 +28,6 @@ type OpusDNSProvider struct {
 
 // OpusDNSProviderModel describes the provider data model.
 //
-// Authentication follows the OAuth2 flows described in
-// api/dev-resources/neovim-api-requests/{auth-login,api-key-connect-test}.http.
-//
 // Three credential modes are supported, selected in this priority order:
 //
 //  1. Pre-minted client credentials: supply `org_id` + `client_secret` (and
