@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/opusdns/opusdns-go-client/models"
 	"github.com/opusdns/opusdns-go-client/opusdns"
@@ -36,6 +37,17 @@ func optionalStringPtr(v types.String) *string {
 	}
 	s := v.ValueString()
 	return &s
+}
+
+// mapToStringMap converts a Terraform `map(string)` into a plain
+// `map[string]string`, returning an empty map for null/unknown inputs.
+func mapToStringMap(ctx context.Context, m types.Map) (map[string]string, diag.Diagnostics) {
+	out := map[string]string{}
+	if m.IsNull() || m.IsUnknown() {
+		return out, nil
+	}
+	d := m.ElementsAs(ctx, &out, false)
+	return out, d
 }
 
 // stringPtrToValue converts a *string (typical of SDK response types) into a

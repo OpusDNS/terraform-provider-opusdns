@@ -361,6 +361,64 @@ Allowed roles: `admin`, `api_admin`, `billing_manager`, `chat_manager`, `cms_con
 
 **Import:** `terraform import opusdns_user_role_assignment.alice <user_id>`
 
+---
+
+### `opusdns_contact_attribute_set`
+
+Manages a TLD-scoped set of registry-specific contact attributes (`POST/GET/PATCH/DELETE /v1/contacts/attribute-sets`). Many ccTLDs (`.de`, `.no`, `.us`, `.eu`, ...) require extra fields on a contact that are not part of the base `opusdns_contact` schema; this resource captures those as a reusable, named bundle that can be linked to one or more contacts.
+
+`tld` and `attributes` are immutable after creation (changing either recreates the set). `label` is updatable in place.
+
+```hcl
+resource "opusdns_contact_attribute_set" "de_person" {
+  label = "DE persons"
+  tld   = "de"
+
+  attributes = {
+    DE_CONTACT_TYPE = "PERSON"
+  }
+}
+```
+
+Attribute keys must come from the registry attribute enum (e.g. `DE_CONTACT_TYPE`, `NOMINET_CO_NO`, `SIDN_LEGAL_FORM`, `US_NEXUS_CATEGORY`). See the OpusDNS API reference for the full enum and per-TLD requirements.
+
+**Note:** A set cannot be deleted while linked to any contact; destroy the linking `opusdns_contact_attribute_link` (or the contacts themselves) first.
+
+**Import:** `terraform import opusdns_contact_attribute_set.de_person <contact_attribute_set_id>`
+
+---
+
+### `opusdns_contact_attribute_link`
+
+Links a contact to a `opusdns_contact_attribute_set` (`PATCH /v1/contacts/{contact_id}/attribute-sets`).
+
+```hcl
+resource "opusdns_contact_attribute_link" "hans" {
+  contact_id               = opusdns_contact.hans.id
+  contact_attribute_set_id = opusdns_contact_attribute_set.de_person.id
+}
+```
+
+**Caveat:** The API does not expose an unlink endpoint. On `terraform destroy` the resource is removed from state with a warning, but the link itself persists server-side until either the contact or the attribute set is deleted.
+
+**Import:** `terraform import opusdns_contact_attribute_link.hans <contact_id>:<contact_attribute_set_id>`
+
+---
+
+### `opusdns_organization_ip_restriction`
+
+Restricts API access for the organization to one or more CIDR blocks (`POST/PATCH/DELETE /v1/organizations/ip-restrictions`). Requires the `manage_organization` permission.
+
+```hcl
+resource "opusdns_organization_ip_restriction" "office" {
+  ip_network = "203.0.113.0/24"
+}
+```
+
+**Warning:** Creating the first IP restriction immediately locks out API clients whose source IP is outside the configured ranges. Verify the running machine's egress IP before applying.
+
+**Import:** `terraform import opusdns_organization_ip_restriction.office <ip_restriction_id>`
+
 ## Data Sources
 
 ### `data.opusdns_zone`
@@ -691,6 +749,100 @@ data "opusdns_tlds" "dnssec_enabled" {
 
 output "tld_names" {
   value = [for t in data.opusdns_tlds.dnssec_enabled.tlds : t.name]
+}
+```
+
+### `data.opusdns_contact_attribute_set`
+
+Reads a single contact attribute set by id (`GET /v1/contacts/attribute-sets/{contact_attribute_set_id}`).
+
+```hcl
+data "opusdns_contact_attribute_set" "de_person" {
+  contact_attribute_set_id = "contact_attribute_set_01jxxxxxxxxxxxxxxxxxxxxxxx"
+}
+```
+
+### `data.opusdns_contact_attribute_sets`
+
+Lists contact attribute sets in the organization (`GET /v1/contacts/attribute-sets`). Optional `tld` and `label` filters narrow the result.
+
+```hcl
+data "opusdns_contact_attribute_sets" "all_de" {
+  tld = "de"
+}
+
+output "set_labels" {
+  value = [for s in data.opusdns_contact_attribute_sets.all_de.contact_attribute_sets : s.label]
+}
+```
+
+### `data.opusdns_organization_ip_restrictions`
+
+Lists all IP restrictions for the organization (`GET /v1/organizations/ip-restrictions`).
+
+```hcl
+data "opusdns_organization_ip_restrictions" "all" {}
+
+output "all_cidrs" {
+  value = [for r in data.opusdns_organization_ip_restrictions.all.ip_restrictions : r.ip_network]
+}
+```
+
+### `data.opusdns_roles`
+
+Lists all roles available in the caller's organization (`GET /v1/organizations/roles`). The endpoint's response shape is untyped in the OpenAPI spec, so this data source surfaces both a best-effort `role_names` list and the raw `roles_json` body.
+
+```hcl
+data "opusdns_roles" "all" {}
+
+output "available_roles" {
+  value = data.opusdns_roles.all.role_names
+}
+```
+
+### `data.opusdns_user_permissions`
+
+Reads a user's effective permission set (`GET /v1/users/{user_id}/permissions`). Returns both a `permissions` list of strings and the raw `permissions_json` for callers needing the unprocessed response.
+
+```hcl
+data "opusdns_user_permissions" "alice" {
+  user_id = opusdns_user.alice.id
+}
+
+output "alice_permissions" {
+  value = data.opusdns_user_permissions.alice.permissions
+}
+```
+
+### `data.opusdns_domain_check`
+
+Performs a real-time bulk availability check (`GET /v1/domains/check`). Richer than `data.opusdns_domain_availability` — also returns premium-pricing info and TMCH `claims_key`s, making it the preferred precondition for `opusdns_domain` registrations of premium or trademarked names.
+
+```hcl
+data "opusdns_domain_check" "candidates" {
+  domains = ["example.com", "example.org"]
+}
+
+output "results" {
+  value = data.opusdns_domain_check.candidates.results
+}
+```
+
+### `data.opusdns_claims_notice`
+
+Retrieves a TMCH trademark claims notice for a single claims key (`POST /v1/domains/claims-notices`). Use the value from `data.opusdns_domain_check.results[*].claims_key`. The returned `claims_notice_acceptance_hash` is required when registering the matching trademarked domain via `opusdns_domain`.
+
+```hcl
+data "opusdns_domain_check" "tm" {
+  domains = ["acme.example"]
+}
+
+data "opusdns_claims_notice" "tm" {
+  claims_key = data.opusdns_domain_check.tm.results[0].claims_key
+}
+
+output "acceptance_hash" {
+  value = data.opusdns_claims_notice.tm.claims_notice_acceptance_hash
 }
 ```
 

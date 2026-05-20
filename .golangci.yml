@@ -16,6 +16,11 @@ linters:
     - staticcheck
     - unconvert
     - unused
+  settings:
+    misspell:
+      # NOMINET is the legal name of the .uk registry; not a misspelling of "nominate".
+      ignore-rules:
+        - nominet
 
 formatters:
   enable:

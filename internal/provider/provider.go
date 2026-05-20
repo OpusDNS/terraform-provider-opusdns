@@ -237,6 +237,9 @@ func (p *OpusDNSProvider) Resources(_ context.Context) []func() resource.Resourc
 		NewHostResource,
 		NewParkingResource,
 		NewRegistrarCredentialResource,
+		NewContactAttributeSetResource,
+		NewContactAttributeLinkResource,
+		NewOrganizationIPRestrictionResource,
 	}
 }
 
@@ -249,6 +252,7 @@ func (p *OpusDNSProvider) DataSources(_ context.Context) []func() datasource.Dat
 		NewUserDataSource,
 		NewUsersDataSource,
 		NewUserRoleAssignmentDataSource,
+		NewUserPermissionsDataSource,
 		NewContactDataSource,
 		NewContactsDataSource,
 		NewDomainDataSource,
@@ -257,6 +261,8 @@ func (p *OpusDNSProvider) DataSources(_ context.Context) []func() datasource.Dat
 		NewDNSRecordDataSource,
 		NewDNSRecordsDataSource,
 		NewDomainAvailabilityDataSource,
+		NewDomainCheckDataSource,
+		NewClaimsNoticeDataSource,
 		NewTLDDataSource,
 		NewTLDsDataSource,
 		NewEmailForwardDataSource,
@@ -270,6 +276,10 @@ func (p *OpusDNSProvider) DataSources(_ context.Context) []func() datasource.Dat
 		NewParkingsDataSource,
 		NewRegistrarCredentialDataSource,
 		NewRegistrarCredentialsDataSource,
+		NewContactAttributeSetDataSource,
+		NewContactAttributeSetsDataSource,
+		NewOrganizationIPRestrictionsDataSource,
+		NewRolesDataSource,
 	}
 }
 
