@@ -878,12 +878,9 @@ The fastest way to exercise the provider end-to-end while you iterate is:
 
 ### 1. Bring up a local OpusDNS API
 
-```sh
-cd ../api
-# Follow the dev-resources README to start the API stack (typically
-# `tilt up` or `docker compose up`). The API will be reachable at
-# https://api.opusdns.com once ready.
-```
+Follow the dev-resources README to start the API stack using the steps documented in the [OpusDNS API repo](https://github.com/OpusDNS/api). 
+The `OPUSDNS_API_ENDPOINT` variable should be set to `http://api.opusdns.local`.
+
 
 ### 2. Build & install the provider
 
@@ -924,20 +921,12 @@ The sibling repo [`test-opusdns-terraform`](../test-opusdns-terraform) contains 
 
 ```
 tests/
-├── zone-basic/
-├── zone-dnssec/
-├── zone-datasources/
-├── record-a/
-├── record-multi-type/
-├── record-update-ttl/
-├── contact-minimal/
-├── contact-full/
-├── email-forward-basic/
-├── email-forward-catchall/
-├── domain-forward-https/
-├── domain-forward-multi/
-└── end-to-end/
+├── client-secret-auth/
+├── user-password-auth/
 ```
+
+These two folders contain identical test cases, but with different provider auth modes (mode 1 vs. mode 3 from the Provider Configuration section above).
+
 
 Pick the smallest case to verify auth + a single CRUD round-trip:
 
