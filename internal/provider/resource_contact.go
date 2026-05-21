@@ -99,13 +99,13 @@ func (r *ContactResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 			"phone": schema.StringAttribute{
 				CustomType:          phoneType{},
 				Required:            true,
-				MarkdownDescription: "The contact's phone number in E.164 format (e.g., `+1.2125551234`). The server may normalize the value (e.g., reformat punctuation); semantic equality is used so reformatted values that canonicalise to the same digits do not trigger drift.",
+				MarkdownDescription: "The contact's phone number in E.164 format (e.g., `+12125551234`). The server normalizes punctuation, so semantic equality is used when formatting differs but the digits are the same.",
 				PlanModifiers:       requiresReplace,
 			},
 			"fax": schema.StringAttribute{
 				CustomType:          phoneType{},
 				Optional:            true,
-				MarkdownDescription: "The contact's fax number in E.164 format. The server may normalize the value; semantic equality is used so reformatted values do not trigger drift.",
+				MarkdownDescription: "The contact's fax number in E.164 format. The server normalizes punctuation, so semantic equality is used when formatting differs but the digits are the same.",
 				PlanModifiers:       requiresReplace,
 			},
 			"street": schema.StringAttribute{

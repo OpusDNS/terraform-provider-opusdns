@@ -5,7 +5,7 @@ resource "opusdns_user" "alice" {
   email      = "alice@example.com"
   first_name = "Alice"
   last_name  = "Anderson"
-  phone      = "+1.2125550100"
+  phone      = "+12125550100"
   locale     = "en-US"
 }
 

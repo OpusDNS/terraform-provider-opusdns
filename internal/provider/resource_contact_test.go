@@ -107,7 +107,7 @@ resource "opusdns_contact" "test" {
   first_name  = "Jane"
   last_name   = "Doe"
   email       = %q
-  phone       = "+1.2125550100"
+  phone       = "+12125550100"
   street      = "123 Main St"
   city        = "New York"
   postal_code = "10001"
@@ -126,8 +126,8 @@ resource "opusdns_contact" "test" {
   org         = "Acme Inc"
   title       = "Dr."
   email       = %q
-  phone       = "+1.4155550100"
-  fax         = "+1.4155550101"
+  phone       = "+14155550100"
+  fax         = "+14155550101"
   street      = "456 Market St"
   city        = "San Francisco"
   state       = "CA"
@@ -146,7 +146,7 @@ resource "opusdns_contact" "test" {
   first_name  = %q
   last_name   = %q
   email       = %q
-  phone       = "+1.2125550199"
+  phone       = "+12125550199"
   street      = "789 Broadway"
   city        = "New York"
   postal_code = "10003"
