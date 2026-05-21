@@ -9,10 +9,13 @@ install:
 test:
 	go test ./... -v -count=1 -timeout 120s
 
+testacc:
+	TF_ACC=1 go test ./internal/provider/ -v -count=1 -parallel=4 -timeout 30m
+
 vet:
 	go vet ./...
 
 fmt:
 	gofmt -s -w .
 
-.PHONY: build install test vet fmt
+.PHONY: build install test testacc vet fmt
