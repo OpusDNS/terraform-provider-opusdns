@@ -88,10 +88,13 @@ git push origin v1.0.0
 ### 3. Automated release
 
 Pushing a `v*` tag triggers the release workflow which:
-1. Builds cross-platform binaries (linux/darwin/windows × amd64/arm64)
-2. Signs the SHA256SUMS file with the GPG key
-3. Creates a GitHub Release with all artifacts
-4. The Terraform Registry automatically detects the new release via webhook
+1. Runs the preview1 acceptance tests
+2. Builds cross-platform binaries (linux/darwin/windows × amd64/arm64)
+3. Signs the SHA256SUMS file with the GPG key
+4. Creates a GitHub Release with all artifacts
+5. The Terraform Registry automatically detects the new release via webhook
+
+If the preview1 acceptance tests fail, the release job is blocked and no release artifacts are published.
 
 ### 4. Verify
 

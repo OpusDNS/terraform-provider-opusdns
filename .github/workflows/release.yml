@@ -9,8 +9,38 @@ permissions:
   contents: write
 
 jobs:
+  acceptance:
+    name: Acceptance Tests (preview1)
+    runs-on: self-hosted
+    environment: preview1
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v4
+        with:
+          terraform_version: latest
+          terraform_wrapper: false
+
+      - name: Run acceptance tests
+        env:
+          TF_ACC: "1"
+          OPUSDNS_CLIENT_SECRET: ${{ secrets.OPUSDNS_CLIENT_SECRET }}
+          OPUSDNS_ORG_ID: ${{ secrets.OPUSDNS_ORG_ID }}
+          OPUSDNS_API_ENDPOINT: ${{ secrets.OPUSDNS_API_ENDPOINT }}
+        run: |
+          go test ./internal/provider/ -v -count=1 -parallel=4 -timeout 30m
+
   release:
     name: GoReleaser
+    needs: acceptance
     runs-on: self-hosted
     steps:
       - uses: actions/checkout@v6
