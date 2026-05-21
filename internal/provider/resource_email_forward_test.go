@@ -2,14 +2,13 @@ package provider
 
 import (
 	"fmt"
-	"math/rand"
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 )
 
 func TestAccEmailForwardResource_basic(t *testing.T) {
-	zoneName := fmt.Sprintf("tfacc-%d.test", rand.Int63())
+	zoneName := testAccDomainName()
 	forwardTo := fmt.Sprintf("admin@%s", zoneName)
 
 	resource.ParallelTest(t, resource.TestCase{
