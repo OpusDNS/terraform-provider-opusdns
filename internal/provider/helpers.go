@@ -5,28 +5,17 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"net/url"
 	"strings"
 	"time"
 
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	"github.com/opusdns/opusdns-go-client/models"
 	"github.com/opusdns/opusdns-go-client/opusdns"
 )
 
 // isNotFound returns true when an API error indicates a 404 Not Found response.
 func isNotFound(err error) bool {
 	return errors.Is(err, opusdns.ErrNotFound)
-}
-
-// addOptionalString sets body[key] = value only when v is a real, set string.
-// Used to assemble JSON request bodies that omit unspecified optional fields.
-func addOptionalString(body map[string]interface{}, key string, v types.String) {
-	if v.IsNull() || v.IsUnknown() {
-		return
-	}
-	body[key] = v.ValueString()
 }
 
 // optionalStringPtr returns a *string for a types.String, or nil when null/unknown.
@@ -156,59 +145,4 @@ func formatAPIError(err error) string {
 		fmt.Fprintf(&b, "\nresponse body:\n%s", strings.TrimSpace(apiErr.RawBody))
 	}
 	return b.String()
-}
-
-// rawCreateOrganization wraps POST /v1/organizations. The SDK as of v1.0.9 has
-// no CreateOrganization helper, so we issue the call directly through the
-// SDK's underlying HTTPClient — this preserves the bearer-token transport
-// configured by the provider.
-func rawCreateOrganization(ctx context.Context, c *opusdns.Client, body map[string]interface{}) (*models.Organization, error) {
-	path := c.HTTPClient().BuildPath("organizations")
-	resp, err := c.HTTPClient().Post(ctx, path, body)
-	if err != nil {
-		return nil, err
-	}
-	var org models.Organization
-	if err := c.HTTPClient().DecodeResponse(resp, &org); err != nil {
-		return nil, err
-	}
-	return &org, nil
-}
-
-// rawDeleteOrganization wraps DELETE /v1/organizations/{id}. The SDK has no
-// DeleteOrganization helper, so we issue it via the underlying HTTPClient.
-func rawDeleteOrganization(ctx context.Context, c *opusdns.Client, orgID models.OrganizationID) error {
-	path := c.HTTPClient().BuildPath("organizations", string(orgID))
-	resp, err := c.HTTPClient().Delete(ctx, path)
-	if err != nil {
-		return err
-	}
-	return c.HTTPClient().DecodeResponse(resp, nil)
-}
-
-// rawListEmailForwardsByZone wraps GET /v1/dns/{zone}/email-forwards.
-//
-// The SDK as of v1.0.9 declares this endpoint as returning a bare
-// []models.EmailForward, but the API actually returns an EmailForwardZone
-// wrapper object ({zone_id, zone_name, email_forwards: [...]}), which makes
-// the SDK helper fail to decode. The sibling DomainForwards SDK service
-// already handles this with a wrapper-first / list-fallback decode; this
-// helper does the same for email forwards until the SDK is fixed upstream.
-func rawListEmailForwardsByZone(ctx context.Context, c *opusdns.Client, zoneName string) ([]models.EmailForward, error) {
-	path := c.HTTPClient().BuildPath("dns", url.PathEscape(zoneName), "email-forwards")
-	resp, err := c.HTTPClient().Get(ctx, path, nil)
-	if err != nil {
-		return nil, err
-	}
-	// Try the wrapper shape the API actually returns first; fall back to a
-	// bare list for forwards-compatibility if the API ever returns one.
-	var zone models.EmailForwardZone
-	if decErr := c.HTTPClient().DecodeResponse(resp, &zone); decErr == nil {
-		return zone.EmailForwards, nil
-	}
-	var list []models.EmailForward
-	if decErr := c.HTTPClient().DecodeResponse(resp, &list); decErr != nil {
-		return nil, decErr
-	}
-	return list, nil
 }

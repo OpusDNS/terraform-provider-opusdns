@@ -28,7 +28,7 @@ provider "opusdns" {
 }
 ```
 
-See [`examples/provider/provider.tf`](examples/provider/provider.tf) for both auth modes wired through Terraform variables.
+See [`examples/provider/provider.tf`](examples/provider/provider.tf) for all supported auth modes wired through Terraform variables.
 
 ### Provider Configuration
 
@@ -634,7 +634,7 @@ data "opusdns_email_forward" "example" {
 
 ### `data.opusdns_email_forwards`
 
-Lists email forwards configured for a zone (`GET /v1/zones/{zone}/email-forwards`).
+Lists email forwards configured for a zone (`GET /v1/dns/{zone}/email-forwards`).
 
 ```hcl
 data "opusdns_email_forwards" "example" {
@@ -658,7 +658,7 @@ data "opusdns_domain_forward" "www" {
 
 ### `data.opusdns_domain_forwards`
 
-Lists domain forwards configured for a zone (`GET /v1/zones/{zone}/domain-forwards`).
+Lists domain forwards configured for a zone (`GET /v1/dns/{zone}/domain-forwards`).
 
 ```hcl
 data "opusdns_domain_forwards" "example" {
@@ -872,104 +872,12 @@ provider_installation {
 
 Then run `make install` to build and install the provider binary. With `dev_overrides` active you do **not** need to run `terraform init` — Terraform will load the binary directly on every `plan`/`apply`.
 
-## Testing Basic Operations During Development
-
-The fastest way to exercise the provider end-to-end while you iterate is:
-
-### 1. Bring up a local OpusDNS API
-
-Follow the dev-resources README to start the API stack using the steps documented in the [OpusDNS API repo](https://github.com/OpusDNS/api). 
-The `OPUSDNS_API_ENDPOINT` variable should be set to `http://api.opusdns.local`.
-
-
-### 2. Build & install the provider
-
-```sh
-make install         # builds and installs to $(go env GOPATH)/bin
-```
-
-Confirm `~/.terraformrc` contains the `dev_overrides` block above pointing at `$(go env GOPATH)/bin`.
-
-### 3. Export credentials
-
-The provider reads `OPUSDNS_*` env vars when the matching attribute is null. For local development against `api.opusdns.com`:
-
-```sh
-# Option A: pre-minted client credentials (preferred)
-export OPUSDNS_API_ENDPOINT="https://api.opusdns.com"
-export OPUSDNS_ORG_ID="organization_01jnh0v027fz2r0pcbavf9qtyy"
-export OPUSDNS_CLIENT_SECRET="cs_xxx"      # from POST /v1/auth/client_credentials
-
-# Option B: full username/password flow (mints a fresh api key per run)
-export OPUSDNS_API_ENDPOINT="https://api.opusdns.com"
-export OPUSDNS_ORG_ID="organization_01jnh0v027fz2r0pcbavf9qtyy"
-export OPUSDNS_USERNAME="example_user"
-export OPUSDNS_PASSWORD="securepassword123"
-```
-
-If you prefer to drive everything through `TF_VAR_*` (e.g. when committing Terraform configs that consume `var.opusdns_*` like [`examples/provider/provider.tf`](examples/provider/provider.tf)):
-
-```sh
-export TF_VAR_opusdns_api_endpoint="https://api.opusdns.com"
-export TF_VAR_opusdns_org_id="organization_01jnh0v027fz2r0pcbavf9qtyy"
-export TF_VAR_opusdns_client_secret="cs_xxx"
-```
-
-### 4. Run a smoke test against the example configs
-
-The sibling repo [`test-opusdns-terraform`](../test-opusdns-terraform) contains ready-to-run Terraform configurations under `tests/`:
-
-```
-tests/
-├── client-secret-auth/
-├── user-password-auth/
-```
-
-These two folders contain identical test cases, but with different provider auth modes (mode 1 vs. mode 3 from the Provider Configuration section above).
-
-
-Pick the smallest case to verify auth + a single CRUD round-trip:
-
-```sh
-cd ../test-opusdns-terraform/tests/zone-basic
-terraform plan      # no `init` needed thanks to dev_overrides
-terraform apply -auto-approve
-terraform destroy -auto-approve
-```
-
-You should see Terraform skip provider download (with a warning that `dev_overrides` is in effect — that's expected), authenticate against your local API, and create/destroy a zone.
-
-### 5. Tighter inner loop while editing provider code
-
-```sh
-# In one terminal, keep rebuilding on save:
-ls internal/**/*.go provider.go | entr -r make install
-
-# In another, re-run a focused test case:
-cd ../test-opusdns-terraform/tests/record-a
-terraform apply -auto-approve && terraform destroy -auto-approve
-```
-
-For richer debugging, set:
-
-```sh
-export TF_LOG=DEBUG                 # full Terraform + provider logs
-export OPUSDNS_DEBUG=true           # SDK-level HTTP request/response logs
-```
-
-### 6. Quick provider-side checks
-
-Before driving Terraform, you can sanity-check the Go code with:
-
-```sh
-make build      # compile only
-make vet        # go vet
-make test       # unit tests (none currently, but useful as you add them)
-make fmt        # gofmt
-```
-
-There are no acceptance tests (`TF_ACC=1 go test ./...`) wired up yet — drive end-to-end coverage through the `test-opusdns-terraform` configs above.
-
 ## License
 
 [Mozilla Public License 2.0](LICENSE)
+
+## Support
+
+- Documentation: <https://developers.opusdns.com>
+- Issues: [GitHub Issues](https://github.com/OpusDNS/terraform-provider-opusdns/issues)
+- Email: <support@opusdns.com>
