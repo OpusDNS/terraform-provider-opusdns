@@ -13,7 +13,7 @@ import (
 
 // phoneType is a custom Terraform string type for phone/fax numbers whose
 // values the OpusDNS API may rewrite to a canonical form (e.g.
-// "+1.2125551234" -> "+1 212-555-1234"). It implements semantic equality so
+// "+1.2125551234" -> "+12125551234"). It implements semantic equality so
 // that the plugin framework accepts a post-apply state value that differs
 // from the planned value as long as both forms canonicalise to the same
 // digits.

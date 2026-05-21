@@ -88,7 +88,7 @@ func (r *UserResource) Schema(_ context.Context, _ resource.SchemaRequest, resp 
 			"phone": schema.StringAttribute{
 				CustomType:          phoneType{},
 				Optional:            true,
-				MarkdownDescription: "Phone number in E.164 format (e.g., `+1.2125551234`). The server may normalize the value (e.g., reformat punctuation); semantic equality is used so reformatted values that canonicalise to the same digits do not trigger drift.",
+				MarkdownDescription: "Phone number in E.164 format (e.g., `+12125551234`). The server normalizes punctuation, so semantic equality is used when formatting differs but the digits are the same.",
 			},
 			"locale": schema.StringAttribute{
 				Optional:            true,
