@@ -115,4 +115,3 @@ Follow [Semantic Versioning](https://semver.org/):
 | GPG signature fails | Ensure the public key on the Registry matches the private key in `GPG_PRIVATE_KEY` secret; check expiry with `gpg --list-keys` |
 | GoReleaser fails | Run `go mod tidy` and commit; ensure no uncommitted changes; tag must be `vX.Y.Z` format |
 | Acceptance tests fail on release | Fix the issue, delete the tag (`git push --delete origin v1.1.0`), re-tag after fix |
-
