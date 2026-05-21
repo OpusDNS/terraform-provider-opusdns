@@ -32,8 +32,7 @@ jobs:
       - name: Run acceptance tests
         env:
           TF_ACC: "1"
-          OPUSDNS_CLIENT_SECRET: ${{ secrets.OPUSDNS_CLIENT_SECRET }}
-          OPUSDNS_ORG_ID: ${{ secrets.OPUSDNS_ORG_ID }}
+          OPUSDNS_API_KEY: ${{ secrets.OPUSDNS_API_KEY }}
           OPUSDNS_API_ENDPOINT: ${{ secrets.OPUSDNS_API_ENDPOINT }}
         run: |
           go test ./internal/provider/ -v -count=1 -parallel=4 -timeout 30m
