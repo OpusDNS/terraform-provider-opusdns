@@ -5,7 +5,9 @@ import (
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-framework/providerserver"
+	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-go/tfprotov6"
+	"github.com/opusdns/opusdns-go-client/opusdns"
 )
 
 // testAccProtoV6ProviderFactories are used to instantiate a provider during
@@ -21,11 +23,8 @@ var testAccProtoV6ProviderFactories = map[string]func() (tfprotov6.ProviderServe
 func testAccPreCheck(t *testing.T) {
 	t.Helper()
 
-	if v := os.Getenv("OPUSDNS_CLIENT_SECRET"); v == "" {
-		t.Fatal("OPUSDNS_CLIENT_SECRET must be set for acceptance tests")
-	}
-	if v := os.Getenv("OPUSDNS_ORG_ID"); v == "" {
-		t.Fatal("OPUSDNS_ORG_ID must be set for acceptance tests")
+	if v := os.Getenv("OPUSDNS_API_KEY"); v == "" {
+		t.Fatal("OPUSDNS_API_KEY must be set for acceptance tests")
 	}
 	if v := os.Getenv("OPUSDNS_API_ENDPOINT"); v == "" {
 		t.Fatal("OPUSDNS_API_ENDPOINT must be set for acceptance tests")
@@ -38,3 +37,64 @@ func testAccPreCheck(t *testing.T) {
 const testAccProviderConfig = `
 provider "opusdns" {}
 `
+
+func TestLoadProviderConfigPrefersProviderValues(t *testing.T) {
+	t.Parallel()
+
+	config := loadProviderConfig(
+		OpusDNSProviderModel{
+			APIKey:      types.StringValue("provider-key"),
+			APIEndpoint: types.StringValue("https://provider.example"),
+		},
+		func(string) string {
+			return "ignored"
+		},
+	)
+
+	if config.APIKey != "provider-key" {
+		t.Fatalf("expected provider api key to win, got %q", config.APIKey)
+	}
+	if config.APIEndpoint != "https://provider.example" {
+		t.Fatalf("expected provider endpoint to win, got %q", config.APIEndpoint)
+	}
+}
+
+func TestLoadProviderConfigFallsBackToEnvironment(t *testing.T) {
+	t.Parallel()
+
+	env := map[string]string{
+		"OPUSDNS_API_KEY":      "env-key",
+		"OPUSDNS_API_ENDPOINT": "https://env.example",
+	}
+
+	config := loadProviderConfig(OpusDNSProviderModel{}, func(key string) string {
+		return env[key]
+	})
+
+	if config.APIKey != "env-key" {
+		t.Fatalf("expected environment api key, got %q", config.APIKey)
+	}
+	if config.APIEndpoint != "https://env.example" {
+		t.Fatalf("expected environment endpoint, got %q", config.APIEndpoint)
+	}
+}
+
+func TestLoadProviderConfigUsesDefaultEndpoint(t *testing.T) {
+	t.Parallel()
+
+	config := loadProviderConfig(
+		OpusDNSProviderModel{
+			APIKey: types.StringValue("provider-key"),
+		},
+		func(string) string {
+			return ""
+		},
+	)
+
+	if config.APIKey != "provider-key" {
+		t.Fatalf("expected provider api key, got %q", config.APIKey)
+	}
+	if config.APIEndpoint != opusdns.DefaultAPIEndpoint {
+		t.Fatalf("expected default endpoint %q, got %q", opusdns.DefaultAPIEndpoint, config.APIEndpoint)
+	}
+}

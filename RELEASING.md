@@ -49,8 +49,7 @@ Create a GitHub Environment called `preview1` (Settings → Environments):
 
 | Secret | Description |
 |---|---|
-| `OPUSDNS_CLIENT_SECRET` | Service account client_secret for preview1 |
-| `OPUSDNS_ORG_ID` | Test organization ID on preview1 |
+| `OPUSDNS_API_KEY` | API key for the preview1 test organization |
 | `OPUSDNS_API_ENDPOINT` | `https://api.preview1.opusdns.dev` |
 
 Optional protection rules:
@@ -64,8 +63,7 @@ Optional protection rules:
 ```bash
 # Run locally (requires preview1 credentials)
 export TF_ACC=1
-export OPUSDNS_CLIENT_SECRET="..."
-export OPUSDNS_ORG_ID="..."
+export OPUSDNS_API_KEY="..."
 export OPUSDNS_API_ENDPOINT="https://api.preview1.opusdns.dev"
 go test ./internal/provider/ -v -count=1 -parallel=4 -timeout 30m
 ```
@@ -116,7 +114,7 @@ If the preview1 acceptance tests fail, the release job is blocked and no release
 
 Follow [Semantic Versioning](https://semver.org/):
 
-- **MAJOR** (v2.0.0): Breaking changes (removed attributes, changed behavior)
+- **MAJOR** (v2.0.0): Breaking changes (removed attributes, changed behavior). Removing provider auth modes such as `client_secret`, `org_id`, `username`, or `password` belongs here.
 - **MINOR** (v1.1.0): New resources, data sources, or attributes (backward compatible)
 - **PATCH** (v1.0.1): Bug fixes, documentation updates
 

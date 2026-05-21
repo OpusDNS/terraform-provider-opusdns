@@ -26,16 +26,12 @@ All provider code lives in `internal/provider/`. The module uses **Terraform Plu
 - **Data sources** → `datasource_<name>.go` (constructor: `New<Name>DataSource()`)
 - **Complex resource helpers** → `<name>_helpers.go` (e.g. `contact_attribute_set_helpers.go`)
 - **Custom types** → `fqdn_type.go`, `phone_type.go`
-- **Shared helpers** → `helpers.go`, `auth.go`
+- **Shared helpers** → `helpers.go`
 
 Every resource/data source is registered in `provider.go` inside `Resources()` / `DataSources()`.
 
-The provider authenticates via three modes (priority order):
-1. `client_secret` + `org_id` → direct `client_credentials` grant (preferred for automation)
-2. `username` + `password` + `org_id` → full 3-step flow (mints a new API key each run)
-3. `username` + `password` only → single-step password grant (user-token mode)
-
-The SDK's `X-Api-Key` header is replaced with `Authorization: Bearer <token>` via a custom `bearerTransport` http.RoundTripper set in `Configure`.
+The provider authenticates with a single mode:
+1. `api_key` (or `OPUSDNS_API_KEY`) → direct API key authentication via the SDK's native `X-Api-Key` header support
 
 ## Key conventions
 
