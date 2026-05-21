@@ -97,6 +97,11 @@ var fqdnRDataTypes = map[string]bool{
 // For composite types (MX, SRV) only the trailing dot of the final
 // whitespace-separated token (the hostname) is removed.
 func normalizeRData(rrsetType, rdata string) string {
+	rrsetType = strings.ToUpper(rrsetType)
+	if rrsetType == "TXT" && len(rdata) >= 2 && strings.HasPrefix(rdata, "\"") && strings.HasSuffix(rdata, "\"") {
+		return strings.TrimSuffix(strings.TrimPrefix(rdata, "\""), "\"")
+	}
+
 	if !fqdnRDataTypes[rrsetType] {
 		return rdata
 	}

@@ -6,6 +6,7 @@ import (
 
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
+	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
 )
@@ -84,6 +85,13 @@ func canonicalPhone(s string) string {
 		plus = "+"
 	}
 	return plus + phoneNonDigit.ReplaceAllString(s, "")
+}
+
+func normalizedPhoneValue(s *string) phoneValue {
+	if s == nil {
+		return phoneValue{StringValue: types.StringNull()}
+	}
+	return phoneValue{StringValue: types.StringValue(canonicalPhone(*s))}
 }
 
 func (v phoneValue) StringSemanticEquals(_ context.Context, other basetypes.StringValuable) (bool, diag.Diagnostics) {

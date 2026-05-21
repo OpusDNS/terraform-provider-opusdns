@@ -24,7 +24,7 @@ func TestAccHostResource_basic(t *testing.T) {
 					resource.TestCheckResourceAttrSet("opusdns_host.test", "host_id"),
 					resource.TestCheckResourceAttr("opusdns_host.test", "hostname", hostname),
 					resource.TestCheckResourceAttr("opusdns_host.test", "ip_addresses.#", "1"),
-					resource.TestCheckTypeSetElemAttr("opusdns_host.test", "ip_addresses.*", "192.0.2.1"),
+					resource.TestCheckTypeSetElemAttr("opusdns_host.test", "ip_addresses.*", "1.1.1.1"),
 					resource.TestCheckResourceAttrSet("opusdns_host.test", "created_on"),
 					resource.TestCheckResourceAttrSet("opusdns_host.test", "updated_on"),
 				),
@@ -46,15 +46,15 @@ func TestAccHostResource_updateIPs(t *testing.T) {
 				Config: testAccHostResourceConfigBasic(domainName, hostname, contactKey),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("opusdns_host.test", "ip_addresses.#", "1"),
-					resource.TestCheckTypeSetElemAttr("opusdns_host.test", "ip_addresses.*", "192.0.2.1"),
+					resource.TestCheckTypeSetElemAttr("opusdns_host.test", "ip_addresses.*", "1.1.1.1"),
 				),
 			},
 			{
 				Config: testAccHostResourceConfigUpdate(domainName, hostname, contactKey),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("opusdns_host.test", "ip_addresses.#", "2"),
-					resource.TestCheckTypeSetElemAttr("opusdns_host.test", "ip_addresses.*", "192.0.2.2"),
-					resource.TestCheckTypeSetElemAttr("opusdns_host.test", "ip_addresses.*", "2001:db8::1"),
+					resource.TestCheckTypeSetElemAttr("opusdns_host.test", "ip_addresses.*", "8.8.8.8"),
+					resource.TestCheckTypeSetElemAttr("opusdns_host.test", "ip_addresses.*", "2606:4700:4700::1111"),
 				),
 			},
 		},
@@ -93,7 +93,7 @@ resource "opusdns_domain" "test" {
 
 resource "opusdns_host" "test" {
   hostname     = format("ns1.%%s", opusdns_domain.test.name)
-  ip_addresses = ["192.0.2.1"]
+  ip_addresses = ["1.1.1.1"]
 }
 `, testAccProviderConfig, contactKey, domainName)
 }
@@ -130,7 +130,7 @@ resource "opusdns_domain" "test" {
 
 resource "opusdns_host" "test" {
   hostname     = format("ns1.%%s", opusdns_domain.test.name)
-  ip_addresses = ["192.0.2.2", "2001:db8::1"]
+  ip_addresses = ["8.8.8.8", "2606:4700:4700::1111"]
 }
 `, testAccProviderConfig, contactKey, domainName)
 }

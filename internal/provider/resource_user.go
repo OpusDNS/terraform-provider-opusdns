@@ -282,7 +282,7 @@ func populateUserModel(data *UserResourceModel, u *models.User) {
 	data.Status = types.StringValue(string(u.Status))
 	data.OrganizationID = types.StringValue(string(u.OrganizationID))
 
-	data.Phone = phoneValue{StringValue: stringPtrToValue(u.Phone)}
+	data.Phone = normalizedPhoneValue(u.Phone)
 
 	if u.CreatedOn != nil {
 		data.CreatedOn = types.StringValue(u.CreatedOn.Format("2006-01-02T15:04:05Z07:00"))
