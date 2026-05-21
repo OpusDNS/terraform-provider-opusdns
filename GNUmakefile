@@ -18,4 +18,7 @@ vet:
 fmt:
 	gofmt -s -w .
 
-.PHONY: build install test testacc vet fmt
+generate-docs:
+	tfplugindocs generate --provider-name opusdns
+
+.PHONY: build install test testacc vet fmt generate-docs
