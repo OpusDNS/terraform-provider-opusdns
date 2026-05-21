@@ -1,8 +1,6 @@
 package provider
 
 import (
-	"fmt"
-	"math/rand"
 	"os"
 	"testing"
 
@@ -32,13 +30,6 @@ func testAccPreCheck(t *testing.T) {
 	if v := os.Getenv("OPUSDNS_API_ENDPOINT"); v == "" {
 		t.Fatal("OPUSDNS_API_ENDPOINT must be set for acceptance tests")
 	}
-}
-
-// randomName generates a unique name for test resources to avoid collisions
-// when tests run in parallel. The prefix helps identify which test created
-// the resource for debugging.
-func randomName(prefix string) string {
-	return fmt.Sprintf("tfacc-%s-%d", prefix, rand.Int63())
 }
 
 // testAccProviderConfig returns the provider configuration block that all
