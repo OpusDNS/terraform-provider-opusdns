@@ -973,3 +973,9 @@ There are no acceptance tests (`TF_ACC=1 go test ./...`) wired up yet — drive 
 ## License
 
 [Mozilla Public License 2.0](LICENSE)
+
+## Support
+
+- Documentation: <https://developers.opusdns.com>
+- Issues: [GitHub Issues](https://github.com/OpusDNS/terraform-provider-opusdns/issues)
+- Email: <support@opusdns.com>
