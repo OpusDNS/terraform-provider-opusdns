@@ -22,7 +22,11 @@ func TestAccDomainDNSSECResource_basic(t *testing.T) {
 					resource.TestCheckResourceAttr("opusdns_domain.test", "name", domainName),
 					resource.TestCheckResourceAttr("opusdns_domain_dnssec.test", "id", domainName),
 					resource.TestCheckResourceAttr("opusdns_domain_dnssec.test", "domain_ref", domainName),
-					resource.TestCheckResourceAttr("opusdns_domain_dnssec.test", "enabled", "true"),
+					resource.TestCheckResourceAttr("opusdns_domain_dnssec.test", "enabled", "false"),
+					resource.TestCheckResourceAttr("opusdns_domain_dnssec.test", "records.0.record_type", "ds_data"),
+					resource.TestCheckResourceAttr("opusdns_domain_dnssec.test", "records.0.algorithm", "13"),
+					resource.TestCheckResourceAttr("opusdns_domain_dnssec.test", "records.0.digest_type", "2"),
+					resource.TestCheckResourceAttr("opusdns_domain_dnssec.test", "records.0.key_tag", "12345"),
 					resource.TestCheckResourceAttrSet("opusdns_domain_dnssec.test", "records.0.record_type"),
 				),
 			},
@@ -62,7 +66,16 @@ resource "opusdns_domain" "test" {
 
 resource "opusdns_domain_dnssec" "test" {
   domain_ref = opusdns_domain.test.name
-  enabled    = true
+
+  records = [
+    {
+      record_type = "ds_data"
+      algorithm   = 13
+      digest      = "0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF"
+      digest_type = 2
+      key_tag     = 12345
+    }
+  ]
 }
 `, testAccProviderConfig, contactKey, domainName)
 }

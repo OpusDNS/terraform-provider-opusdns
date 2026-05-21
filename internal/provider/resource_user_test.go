@@ -17,7 +17,7 @@ func TestAccUserResource_basic(t *testing.T) {
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
-				Config: testAccUserResourceConfig(username, email, "Terraform", "Acceptance", "en-US"),
+				Config: testAccUserResourceConfig(username, email, "Terraform", "Acceptance", "en_US"),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttrSet("opusdns_user.test", "id"),
 					resource.TestCheckResourceAttrSet("opusdns_user.test", "user_id"),
@@ -25,7 +25,7 @@ func TestAccUserResource_basic(t *testing.T) {
 					resource.TestCheckResourceAttr("opusdns_user.test", "email", email),
 					resource.TestCheckResourceAttr("opusdns_user.test", "first_name", "Terraform"),
 					resource.TestCheckResourceAttr("opusdns_user.test", "last_name", "Acceptance"),
-					resource.TestCheckResourceAttr("opusdns_user.test", "locale", "en-US"),
+					resource.TestCheckResourceAttr("opusdns_user.test", "locale", "en_US"),
 					resource.TestCheckResourceAttrSet("opusdns_user.test", "organization_id"),
 					resource.TestCheckResourceAttrSet("opusdns_user.test", "status"),
 				),

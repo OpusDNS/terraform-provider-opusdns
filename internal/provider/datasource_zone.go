@@ -88,7 +88,7 @@ func (d *ZoneDataSource) Read(ctx context.Context, req datasource.ReadRequest, r
 	// when the API returns the FQDN with a trailing dot.
 	data.ID = fqdnValue{StringValue: types.StringValue(zone.Name)}
 	data.Name = fqdnValue{StringValue: types.StringValue(zone.Name)}
-	data.DNSSECStatus = types.StringValue(string(zone.DNSSECStatus))
+	data.DNSSECStatus = normalizedDNSSECStatus(string(zone.DNSSECStatus))
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }

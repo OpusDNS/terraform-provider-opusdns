@@ -289,13 +289,18 @@ func (r *DomainResource) Create(ctx context.Context, req resource.CreateRequest,
 		return
 	}
 
-	// If the user wants the transfer lock applied (default true) and the
-	// freshly-registered domain doesn't already have it, follow up with a
-	// PATCH to add the clientTransferProhibited status. The API doesn't
-	// accept transfer_lock at create time.
-	if data.TransferLock.ValueBool() && !domainHasClientTransferProhibited(domain) {
+	// The API doesn't accept transfer_lock at create time, so reconcile the
+	// freshly-created domain to the desired lock state afterwards.
+	hasTransferLock := domainHasClientTransferProhibited(domain)
+	if data.TransferLock.ValueBool() != hasTransferLock {
+		statusChanges := &models.StatusChanges{}
+		if data.TransferLock.ValueBool() {
+			statusChanges.Add = []string{clientTransferProhibitedStatus}
+		} else {
+			statusChanges.Remove = []string{clientTransferProhibitedStatus}
+		}
 		updated, uErr := r.client.Domains.UpdateDomain(ctx, string(domain.DomainID), &models.DomainUpdateRequest{
-			StatusChanges: &models.StatusChanges{Add: []string{clientTransferProhibitedStatus}},
+			StatusChanges: statusChanges,
 		})
 		if uErr != nil {
 			resp.Diagnostics.AddError("Error setting transfer_lock on new domain", formatAPIError(uErr))
