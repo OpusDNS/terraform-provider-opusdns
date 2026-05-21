@@ -21,8 +21,8 @@ type OrganizationDataSource struct {
 	client *opusdns.Client
 }
 
-// OrganizationDataSourceModel mirrors OrganizationResourceModel but adds a
-// `me` toggle and makes `organization_id` optional.
+// OrganizationDataSourceModel describes the organization data source state. It
+// adds a `me` toggle and makes `organization_id` optional.
 type OrganizationDataSourceModel struct {
 	ID                   types.String `tfsdk:"id"`
 	OrganizationID       types.String `tfsdk:"organization_id"`
