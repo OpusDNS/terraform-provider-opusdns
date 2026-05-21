@@ -1,6 +1,8 @@
 package provider
 
 import (
+	"fmt"
+	"math/rand"
 	"os"
 	"testing"
 
@@ -37,6 +39,20 @@ func testAccPreCheck(t *testing.T) {
 const testAccProviderConfig = `
 provider "opusdns" {}
 `
+
+const testAccDomainTLD = "com"
+
+func testAccDomainLabel() string {
+	return fmt.Sprintf("tfacc-%d", rand.Int63())
+}
+
+func testAccDomainName() string {
+	return testAccDomainNameFromLabel(testAccDomainLabel())
+}
+
+func testAccDomainNameFromLabel(label string) string {
+	return fmt.Sprintf("%s.%s", label, testAccDomainTLD)
+}
 
 func TestLoadProviderConfigPrefersProviderValues(t *testing.T) {
 	t.Parallel()

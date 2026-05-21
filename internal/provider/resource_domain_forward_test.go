@@ -2,14 +2,13 @@ package provider
 
 import (
 	"fmt"
-	"math/rand"
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 )
 
 func TestAccDomainForwardResource_basic(t *testing.T) {
-	zoneName := fmt.Sprintf("tfacc-%d.test", rand.Int63())
+	zoneName := testAccDomainName()
 
 	resource.ParallelTest(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
@@ -33,7 +32,7 @@ func TestAccDomainForwardResource_basic(t *testing.T) {
 }
 
 func TestAccDomainForwardResource_update(t *testing.T) {
-	zoneName := fmt.Sprintf("tfacc-%d.test", rand.Int63())
+	zoneName := testAccDomainName()
 
 	resource.ParallelTest(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },

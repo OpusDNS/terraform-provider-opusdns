@@ -2,14 +2,13 @@ package provider
 
 import (
 	"fmt"
-	"math/rand"
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 )
 
 func TestAccRecordResource_A(t *testing.T) {
-	zoneName := fmt.Sprintf("tfacc-%d.test", rand.Int63())
+	zoneName := testAccDomainName()
 
 	resource.ParallelTest(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
@@ -46,7 +45,7 @@ func TestAccRecordResource_A(t *testing.T) {
 }
 
 func TestAccRecordResource_AAAA(t *testing.T) {
-	zoneName := fmt.Sprintf("tfacc-%d.test", rand.Int63())
+	zoneName := testAccDomainName()
 
 	resource.ParallelTest(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
@@ -64,7 +63,7 @@ func TestAccRecordResource_AAAA(t *testing.T) {
 }
 
 func TestAccRecordResource_CNAME(t *testing.T) {
-	zoneName := fmt.Sprintf("tfacc-%d.test", rand.Int63())
+	zoneName := testAccDomainName()
 
 	resource.ParallelTest(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
@@ -83,7 +82,7 @@ func TestAccRecordResource_CNAME(t *testing.T) {
 }
 
 func TestAccRecordResource_MX(t *testing.T) {
-	zoneName := fmt.Sprintf("tfacc-%d.test", rand.Int63())
+	zoneName := testAccDomainName()
 
 	resource.ParallelTest(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
@@ -102,7 +101,7 @@ func TestAccRecordResource_MX(t *testing.T) {
 }
 
 func TestAccRecordResource_TXT(t *testing.T) {
-	zoneName := fmt.Sprintf("tfacc-%d.test", rand.Int63())
+	zoneName := testAccDomainName()
 
 	resource.ParallelTest(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
@@ -120,7 +119,7 @@ func TestAccRecordResource_TXT(t *testing.T) {
 }
 
 func TestAccRecordResource_multiRecord(t *testing.T) {
-	zoneName := fmt.Sprintf("tfacc-%d.test", rand.Int63())
+	zoneName := testAccDomainName()
 
 	resource.ParallelTest(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
@@ -137,7 +136,7 @@ func TestAccRecordResource_multiRecord(t *testing.T) {
 }
 
 func TestAccRecordResource_updateTTL(t *testing.T) {
-	zoneName := fmt.Sprintf("tfacc-%d.test", rand.Int63())
+	zoneName := testAccDomainName()
 
 	resource.ParallelTest(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
@@ -162,7 +161,7 @@ func TestAccRecordResource_updateTTL(t *testing.T) {
 }
 
 func TestAccRecordResource_NS(t *testing.T) {
-	zoneName := fmt.Sprintf("tfacc-%d.test", rand.Int63())
+	zoneName := testAccDomainName()
 
 	resource.ParallelTest(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
@@ -180,7 +179,7 @@ func TestAccRecordResource_NS(t *testing.T) {
 }
 
 func TestAccRecordResource_SRV(t *testing.T) {
-	zoneName := fmt.Sprintf("tfacc-%d.test", rand.Int63())
+	zoneName := testAccDomainName()
 
 	resource.ParallelTest(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },

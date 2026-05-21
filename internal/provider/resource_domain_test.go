@@ -9,8 +9,8 @@ import (
 )
 
 func TestAccDomainResource_basic(t *testing.T) {
-	domainLabel := fmt.Sprintf("tfacc-%d", rand.Int63())
-	domainName := fmt.Sprintf("%s.test", domainLabel)
+	domainLabel := testAccDomainLabel()
+	domainName := testAccDomainNameFromLabel(domainLabel)
 	contactKey := fmt.Sprintf("tfacc-%d", rand.Int63())
 
 	resource.ParallelTest(t, resource.TestCase{
@@ -26,7 +26,7 @@ func TestAccDomainResource_basic(t *testing.T) {
 					resource.TestCheckResourceAttrSet("opusdns_domain.test", "registry_account_id"),
 					resource.TestCheckResourceAttr("opusdns_domain.test", "name", domainName),
 					resource.TestCheckResourceAttr("opusdns_domain.test", "sld", domainLabel),
-					resource.TestCheckResourceAttr("opusdns_domain.test", "tld", "test"),
+					resource.TestCheckResourceAttr("opusdns_domain.test", "tld", testAccDomainTLD),
 					resource.TestCheckResourceAttr("opusdns_domain.test", "period_value", "1"),
 					resource.TestCheckResourceAttr("opusdns_domain.test", "period_unit", "y"),
 					resource.TestCheckResourceAttr("opusdns_domain.test", "create_zone", "true"),
@@ -41,7 +41,7 @@ func TestAccDomainResource_basic(t *testing.T) {
 }
 
 func TestAccDomainResource_updateTransferLock(t *testing.T) {
-	domainName := fmt.Sprintf("tfacc-%d.test", rand.Int63())
+	domainName := testAccDomainName()
 	contactKey := fmt.Sprintf("tfacc-%d", rand.Int63())
 
 	resource.ParallelTest(t, resource.TestCase{
@@ -74,7 +74,7 @@ resource "opusdns_contact" "test" {
   first_name  = "Terraform"
   last_name   = "Acceptance"
   org         = "OpusDNS"
-  email       = "%s@example.test"
+  email       = "%s@example.com"
   phone       = "+1.2125551234"
   street      = "123 Terraform Street"
   city        = "Exampleville"
@@ -106,7 +106,7 @@ resource "opusdns_contact" "test" {
   first_name  = "Terraform"
   last_name   = "Acceptance"
   org         = "OpusDNS"
-  email       = "%s@example.test"
+  email       = "%s@example.com"
   phone       = "+1.2125551234"
   street      = "123 Terraform Street"
   city        = "Exampleville"

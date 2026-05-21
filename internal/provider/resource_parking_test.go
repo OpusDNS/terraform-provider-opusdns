@@ -9,7 +9,7 @@ import (
 )
 
 func TestAccParkingResource_basic(t *testing.T) {
-	domainName := fmt.Sprintf("tfacc-%d.test", rand.Int63())
+	domainName := testAccDomainName()
 	contactKey := fmt.Sprintf("tfacc-%d", rand.Int63())
 
 	resource.ParallelTest(t, resource.TestCase{
@@ -39,7 +39,7 @@ resource "opusdns_contact" "test" {
   first_name  = "Terraform"
   last_name   = "Acceptance"
   org         = "OpusDNS"
-  email       = "%s@example.test"
+  email       = "%s@example.com"
   phone       = "+1.2125551234"
   street      = "123 Terraform Street"
   city        = "Exampleville"
