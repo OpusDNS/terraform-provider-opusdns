@@ -161,27 +161,6 @@ resource "opusdns_domain_forward" "www" {
 
 ---
 
-### `opusdns_organization`
-
-Manages an organization under the authenticated caller's organization (the API treats the caller as the parent automatically). `name` and the address/tax fields are updatable in-place; `create` and `delete` are full lifecycle operations against `/v1/organizations`.
-
-```hcl
-resource "opusdns_organization" "subsidiary" {
-  name           = "Acme Subsidiary, Inc."
-  address_1      = "123 Main St"
-  city           = "New York"
-  state          = "NY"
-  postal_code    = "10001"
-  country_code   = "US"
-  currency       = "USD"
-  default_locale = "en-US"
-}
-```
-
-**Import:** `terraform import opusdns_organization.subsidiary <organization_id>`
-
----
-
 ### `opusdns_user`
 
 Manages a user under the authenticated caller's organization (`/v1/users`). `username` and `email` are immutable — changing either recreates the user.
@@ -396,20 +375,6 @@ resource "opusdns_contact_attribute_link" "hans" {
 **Import:** `terraform import opusdns_contact_attribute_link.hans <contact_id>:<contact_attribute_set_id>`
 
 ---
-
-### `opusdns_organization_ip_restriction`
-
-Restricts API access for the organization to one or more CIDR blocks (`POST/PATCH/DELETE /v1/organizations/ip-restrictions`). Requires the `manage_organization` permission.
-
-```hcl
-resource "opusdns_organization_ip_restriction" "office" {
-  ip_network = "203.0.113.0/24"
-}
-```
-
-**Warning:** Creating the first IP restriction immediately locks out API clients whose source IP is outside the configured ranges. Verify the running machine's egress IP before applying.
-
-**Import:** `terraform import opusdns_organization_ip_restriction.office <ip_restriction_id>`
 
 ## Data Sources
 
@@ -765,18 +730,6 @@ data "opusdns_contact_attribute_sets" "all_de" {
 
 output "set_labels" {
   value = [for s in data.opusdns_contact_attribute_sets.all_de.contact_attribute_sets : s.label]
-}
-```
-
-### `data.opusdns_organization_ip_restrictions`
-
-Lists all IP restrictions for the organization (`GET /v1/organizations/ip-restrictions`).
-
-```hcl
-data "opusdns_organization_ip_restrictions" "all" {}
-
-output "all_cidrs" {
-  value = [for r in data.opusdns_organization_ip_restrictions.all.ip_restrictions : r.ip_network]
 }
 ```
 

@@ -84,10 +84,9 @@ func (d *ZoneDataSource) Read(ctx context.Context, req datasource.ReadRequest, r
 		return
 	}
 
-	// fqdnType semantic equality keeps the user-supplied form in state even
-	// when the API returns the FQDN with a trailing dot.
-	data.ID = fqdnValue{StringValue: types.StringValue(zone.Name)}
-	data.Name = fqdnValue{StringValue: types.StringValue(zone.Name)}
+	resolvedName := canonicalZoneName(zone.Name)
+	data.ID = fqdnValue{StringValue: types.StringValue(resolvedName)}
+	data.Name = fqdnValue{StringValue: types.StringValue(resolvedName)}
 	data.DNSSECStatus = normalizedDNSSECStatus(string(zone.DNSSECStatus))
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)

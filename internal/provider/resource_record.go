@@ -3,6 +3,7 @@ package provider
 import (
 	"context"
 	"fmt"
+	"sort"
 	"strings"
 
 	"github.com/hashicorp/terraform-plugin-framework/diag"
@@ -166,10 +167,7 @@ func (r *RecordResource) Read(ctx context.Context, req resource.ReadRequest, res
 		return
 	}
 
-	rdatas := make([]string, len(rrset.Records))
-	for i, r := range rrset.Records {
-		rdatas[i] = normalizeRData(string(rrset.Type), r.RData)
-	}
+	rdatas := normalizedRecordData(string(rrset.Type), rrset.Records)
 
 	recordList, diags := types.ListValueFrom(ctx, types.StringType, rdatas)
 	resp.Diagnostics.Append(diags...)
@@ -274,10 +272,7 @@ func (r *RecordResource) ImportState(ctx context.Context, req resource.ImportSta
 		return
 	}
 
-	rdatas := make([]string, len(rrset.Records))
-	for i, rec := range rrset.Records {
-		rdatas[i] = normalizeRData(string(rrset.Type), rec.RData)
-	}
+	rdatas := normalizedRecordData(string(rrset.Type), rrset.Records)
 
 	recordList, diags := types.ListValueFrom(ctx, types.StringType, rdatas)
 	resp.Diagnostics.Append(diags...)
@@ -316,6 +311,15 @@ func buildRRSet(ctx context.Context, data RecordResourceModel, diagnostics *diag
 		TTL:     int(data.TTL.ValueInt64()),
 		Records: records,
 	}
+}
+
+func normalizedRecordData(rrsetType string, records []models.RecordData) []string {
+	rdatas := make([]string, len(records))
+	for i, rec := range records {
+		rdatas[i] = normalizeRData(rrsetType, rec.RData)
+	}
+	sort.Strings(rdatas)
+	return rdatas
 }
 
 // findRRSet finds an RRSet by name and type within a slice.

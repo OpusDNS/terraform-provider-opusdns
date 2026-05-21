@@ -284,7 +284,7 @@ func populateContactModel(data *ContactResourceModel, c *models.Contact) {
 	data.FirstName = types.StringValue(c.FirstName)
 	data.LastName = types.StringValue(c.LastName)
 	data.Email = types.StringValue(c.Email)
-	data.Phone = phoneValue{StringValue: types.StringValue(c.Phone)}
+	data.Phone = normalizedPhoneValue(&c.Phone)
 	data.Street = types.StringValue(c.Street)
 	data.City = types.StringValue(c.City)
 	data.PostalCode = types.StringValue(c.PostalCode)
@@ -302,7 +302,7 @@ func populateContactModel(data *ContactResourceModel, c *models.Contact) {
 		data.Title = types.StringNull()
 	}
 	if c.Fax != nil {
-		data.Fax = phoneValue{StringValue: types.StringValue(*c.Fax)}
+		data.Fax = normalizedPhoneValue(c.Fax)
 	} else {
 		data.Fax = phoneValue{StringValue: types.StringNull()}
 	}
