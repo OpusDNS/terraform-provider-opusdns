@@ -126,7 +126,7 @@ func (d *EmailForwardsDataSource) Read(ctx context.Context, req datasource.ReadR
 		return
 	}
 
-	efs, err := rawListEmailForwardsByZone(ctx, d.client, zoneName)
+	efs, err := d.client.EmailForwards.ListEmailForwardsByZone(ctx, zoneName)
 	if err != nil {
 		resp.Diagnostics.AddError("Error listing email forwards", formatAPIError(err))
 		return

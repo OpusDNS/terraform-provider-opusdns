@@ -246,22 +246,23 @@ func (r *OrganizationResource) Create(ctx context.Context, req resource.CreateRe
 		return
 	}
 
-	// The API derives parent_organization_id from the auth context, so we just
-	// send the OrganizationCreate body (which inherits OrganizationBase).
-	body := map[string]interface{}{
-		"name": data.Name.ValueString(),
+	createReq := &models.OrganizationCreateRequest{
+		Name:           data.Name.ValueString(),
+		Address1:       optionalStringPtr(data.Address1),
+		Address2:       optionalStringPtr(data.Address2),
+		City:           optionalStringPtr(data.City),
+		State:          optionalStringPtr(data.State),
+		PostalCode:     optionalStringPtr(data.PostalCode),
+		CountryCode:    optionalStringPtr(data.CountryCode),
+		BusinessNumber: optionalStringPtr(data.BusinessNumber),
+		TaxID:          optionalStringPtr(data.TaxID),
+		TaxIDType:      optionalStringPtr(data.TaxIDType),
+		DefaultLocale:  optionalStringPtr(data.DefaultLocale),
 	}
-	addOptionalString(body, "address_1", data.Address1)
-	addOptionalString(body, "address_2", data.Address2)
-	addOptionalString(body, "city", data.City)
-	addOptionalString(body, "state", data.State)
-	addOptionalString(body, "postal_code", data.PostalCode)
-	addOptionalString(body, "country_code", data.CountryCode)
-	addOptionalString(body, "business_number", data.BusinessNumber)
-	addOptionalString(body, "tax_id", data.TaxID)
-	addOptionalString(body, "tax_id_type", data.TaxIDType)
-	addOptionalString(body, "currency", data.Currency)
-	addOptionalString(body, "default_locale", data.DefaultLocale)
+	if !data.Currency.IsNull() && !data.Currency.IsUnknown() {
+		currency := models.Currency(data.Currency.ValueString())
+		createReq.Currency = &currency
+	}
 
 	// Convert the `users` list (if any) to the JSON shape the API expects.
 	// Mirrors models.UserCreate at api/common/models/account/user.py:71.
@@ -271,23 +272,21 @@ func (r *OrganizationResource) Create(ctx context.Context, req resource.CreateRe
 		if resp.Diagnostics.HasError() {
 			return
 		}
-		usersBody := make([]map[string]interface{}, 0, len(users))
+		createReq.Users = make([]models.UserCreateRequest, 0, len(users))
 		for _, u := range users {
-			entry := map[string]interface{}{
-				"username":   u.Username.ValueString(),
-				"first_name": u.FirstName.ValueString(),
-				"last_name":  u.LastName.ValueString(),
-				"email":      u.Email.ValueString(),
-				"locale":     u.Locale.ValueString(),
-			}
-			addOptionalString(entry, "phone", u.Phone)
-			addOptionalString(entry, "password", u.Password)
-			usersBody = append(usersBody, entry)
+			createReq.Users = append(createReq.Users, models.UserCreateRequest{
+				Username:  u.Username.ValueString(),
+				FirstName: u.FirstName.ValueString(),
+				LastName:  u.LastName.ValueString(),
+				Email:     u.Email.ValueString(),
+				Locale:    u.Locale.ValueString(),
+				Phone:     optionalStringPtr(u.Phone),
+				Password:  optionalStringPtr(u.Password),
+			})
 		}
-		body["users"] = usersBody
 	}
 
-	org, err := rawCreateOrganization(ctx, r.client, body)
+	org, err := r.client.Organizations.CreateOrganization(ctx, createReq)
 	if err != nil {
 		resp.Diagnostics.AddError("Error creating organization", formatAPIError(err))
 		return
@@ -437,7 +436,7 @@ func (r *OrganizationResource) Delete(ctx context.Context, req resource.DeleteRe
 		return
 	}
 
-	if err := rawDeleteOrganization(ctx, r.client, models.OrganizationID(orgIDStr)); err != nil {
+	if err := r.client.Organizations.DeleteOrganization(ctx, models.OrganizationID(orgIDStr)); err != nil {
 		if !isNotFound(err) {
 			resp.Diagnostics.AddError("Error deleting organization", formatAPIError(err))
 		}
