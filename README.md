@@ -28,7 +28,7 @@ provider "opusdns" {
 }
 ```
 
-See [`examples/provider/provider.tf`](examples/provider/provider.tf) for both auth modes wired through Terraform variables.
+See [`examples/provider/provider.tf`](examples/provider/provider.tf) for all supported auth modes wired through Terraform variables.
 
 ### Provider Configuration
 
@@ -634,7 +634,7 @@ data "opusdns_email_forward" "example" {
 
 ### `data.opusdns_email_forwards`
 
-Lists email forwards configured for a zone (`GET /v1/zones/{zone}/email-forwards`).
+Lists email forwards configured for a zone (`GET /v1/dns/{zone}/email-forwards`).
 
 ```hcl
 data "opusdns_email_forwards" "example" {
@@ -658,7 +658,7 @@ data "opusdns_domain_forward" "www" {
 
 ### `data.opusdns_domain_forwards`
 
-Lists domain forwards configured for a zone (`GET /v1/zones/{zone}/domain-forwards`).
+Lists domain forwards configured for a zone (`GET /v1/dns/{zone}/domain-forwards`).
 
 ```hcl
 data "opusdns_domain_forwards" "example" {
