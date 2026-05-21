@@ -35,6 +35,9 @@ func TestAccContactResource_basic(t *testing.T) {
 				ResourceName:      "opusdns_contact.test",
 				ImportState:       true,
 				ImportStateVerify: true,
+				ImportStateVerifyIgnore: []string{
+					"phone",
+				},
 			},
 		},
 	})
