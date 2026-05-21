@@ -150,7 +150,7 @@ func (r *DomainResource) Schema(_ context.Context, _ resource.SchemaRequest, res
 				Optional:            true,
 				Computed:            true,
 				Default:             booldefault.StaticBool(false),
-				MarkdownDescription: "When `true`, also creates a DNS zone for the domain on OpusDNS nameserver infrastructure. Defaults to `false`. Forces replacement.",
+				MarkdownDescription: "When `true`, also creates a DNS zone for the domain on OpusDNS nameserver infrastructure. On destroy, the provider also attempts to delete that side-effect zone. Defaults to `false`. Forces replacement.",
 				PlanModifiers: []planmodifier.Bool{
 					boolplanmodifier.RequiresReplace(),
 					boolplanmodifier.UseStateForUnknown(),
@@ -443,6 +443,25 @@ func (r *DomainResource) Delete(ctx context.Context, req resource.DeleteRequest,
 	if err := r.client.Domains.DeleteDomain(ctx, domainID); err != nil {
 		if !isNotFound(err) {
 			resp.Diagnostics.AddError("Error deleting domain", formatAPIError(err))
+			return
+		}
+	}
+
+	if data.CreateZone.ValueBool() {
+		zoneName := canonicalZoneName(data.Name.ValueString())
+		if zoneName == "" {
+			resp.Diagnostics.AddError(
+				"Invalid domain zone cleanup state",
+				"The opusdns_domain resource was created with `create_zone = true`, but its `name` is empty in state, so the provider cannot delete the side-effect DNS zone. "+
+					"Remove the resource from state with `terraform state rm` and, if the zone still exists at OpusDNS, delete it manually.",
+			)
+			return
+		}
+
+		if err := r.client.DNS.DeleteZone(ctx, zoneName); err != nil {
+			if !isNotFound(err) {
+				resp.Diagnostics.AddError("Error deleting DNS zone created by domain", formatAPIError(err))
+			}
 		}
 	}
 }

@@ -199,7 +199,7 @@ resource "opusdns_tag" "production" {
 
 ### `opusdns_domain`
 
-Registers and manages a domain (`/v1/domains`). `contacts`, `nameservers`, `renewal_mode`, and `transfer_lock` are updatable in place; all other inputs (name, period, `create_zone`, `auth_code`) force replacement.
+Registers and manages a domain (`/v1/domains`). `contacts`, `nameservers`, `renewal_mode`, and `transfer_lock` are updatable in place; all other inputs (name, period, `create_zone`, `auth_code`) force replacement. If `create_zone = true`, destroying the resource also attempts to delete the side-effect DNS zone.
 
 ```hcl
 resource "opusdns_domain" "example" {
