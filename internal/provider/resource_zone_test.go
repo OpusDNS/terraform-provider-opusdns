@@ -20,7 +20,7 @@ func TestAccZoneResource_basic(t *testing.T) {
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("opusdns_zone.test", "name", zoneName),
 					resource.TestCheckResourceAttr("opusdns_zone.test", "id", zoneName),
-					resource.TestCheckResourceAttrSet("opusdns_zone.test", "dnssec_status"),
+					resource.TestCheckResourceAttr("opusdns_zone.test", "dnssec_status", "disabled"),
 				),
 			},
 			// ImportState

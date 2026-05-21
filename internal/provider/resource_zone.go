@@ -24,6 +24,13 @@ type ZoneResource struct {
 	client *opusdns.Client
 }
 
+func normalizedDNSSECStatus(status string) types.String {
+	if status == "" {
+		return types.StringValue(string(models.DNSSECStatusDisabled))
+	}
+	return types.StringValue(status)
+}
+
 // ZoneResourceModel describes the resource data model.
 type ZoneResourceModel struct {
 	ID           fqdnValue    `tfsdk:"id"`
@@ -135,7 +142,7 @@ func (r *ZoneResource) Create(ctx context.Context, req resource.CreateRequest, r
 
 	data.ID = fqdnValue{StringValue: types.StringValue(resolvedName)}
 	data.Name = fqdnValue{StringValue: types.StringValue(resolvedName)}
-	data.DNSSECStatus = types.StringValue(string(zone.DNSSECStatus))
+	data.DNSSECStatus = normalizedDNSSECStatus(string(zone.DNSSECStatus))
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
@@ -178,7 +185,7 @@ func (r *ZoneResource) Read(ctx context.Context, req resource.ReadRequest, resp 
 
 	data.ID = fqdnValue{StringValue: types.StringValue(apiName)}
 	data.Name = fqdnValue{StringValue: types.StringValue(apiName)}
-	data.DNSSECStatus = types.StringValue(string(zone.DNSSECStatus))
+	data.DNSSECStatus = normalizedDNSSECStatus(string(zone.DNSSECStatus))
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
@@ -236,7 +243,7 @@ func (r *ZoneResource) Update(ctx context.Context, req resource.UpdateRequest, r
 
 	plan.ID = fqdnValue{StringValue: types.StringValue(apiName)}
 	plan.Name = fqdnValue{StringValue: types.StringValue(apiName)}
-	plan.DNSSECStatus = types.StringValue(string(zone.DNSSECStatus))
+	plan.DNSSECStatus = normalizedDNSSECStatus(string(zone.DNSSECStatus))
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
@@ -300,7 +307,7 @@ func (r *ZoneResource) ImportState(ctx context.Context, req resource.ImportState
 	data := ZoneResourceModel{
 		ID:           fqdnValue{StringValue: types.StringValue(resolvedName)},
 		Name:         fqdnValue{StringValue: types.StringValue(resolvedName)},
-		DNSSECStatus: types.StringValue(string(zone.DNSSECStatus)),
+		DNSSECStatus: normalizedDNSSECStatus(string(zone.DNSSECStatus)),
 	}
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)

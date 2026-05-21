@@ -106,7 +106,7 @@ func (d *ZonesDataSource) Read(ctx context.Context, req datasource.ReadRequest, 
 	for i, z := range zones {
 		obj, diags := types.ObjectValue(zoneItemAttrTypes, map[string]attr.Value{
 			"name":          types.StringValue(canonicalZoneName(z.Name)),
-			"dnssec_status": types.StringValue(string(z.DNSSECStatus)),
+			"dnssec_status": normalizedDNSSECStatus(string(z.DNSSECStatus)),
 		})
 		resp.Diagnostics.Append(diags...)
 		if resp.Diagnostics.HasError() {

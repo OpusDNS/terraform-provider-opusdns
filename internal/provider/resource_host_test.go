@@ -61,7 +61,7 @@ func TestAccHostResource_updateIPs(t *testing.T) {
 	})
 }
 
-func testAccHostResourceConfigBasic(domainName, hostname, contactKey string) string {
+func testAccHostResourceConfigBasic(domainName, _ string, contactKey string) string {
 	return fmt.Sprintf(`
 %s
 
@@ -92,13 +92,13 @@ resource "opusdns_domain" "test" {
 }
 
 resource "opusdns_host" "test" {
-  hostname     = %q
+  hostname     = format("ns1.%%s", opusdns_domain.test.name)
   ip_addresses = ["192.0.2.1"]
 }
-`, testAccProviderConfig, contactKey, domainName, hostname)
+`, testAccProviderConfig, contactKey, domainName)
 }
 
-func testAccHostResourceConfigUpdate(domainName, hostname, contactKey string) string {
+func testAccHostResourceConfigUpdate(domainName, _ string, contactKey string) string {
 	return fmt.Sprintf(`
 %s
 
@@ -129,8 +129,8 @@ resource "opusdns_domain" "test" {
 }
 
 resource "opusdns_host" "test" {
-  hostname     = %q
+  hostname     = format("ns1.%%s", opusdns_domain.test.name)
   ip_addresses = ["192.0.2.2", "2001:db8::1"]
 }
-`, testAccProviderConfig, contactKey, domainName, hostname)
+`, testAccProviderConfig, contactKey, domainName)
 }
