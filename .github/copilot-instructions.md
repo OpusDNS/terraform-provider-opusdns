@@ -7,6 +7,7 @@ make build          # go build ./...
 make test           # go test ./... -v -count=1 -timeout 120s
 make vet            # go vet ./...
 make fmt            # gofmt -s -w .
+make generate-docs  # regenerate Terraform Registry docs from schemas + templates
 golangci-lint run   # lint (config in .golangci.yml)
 
 # Run a single test
@@ -81,3 +82,34 @@ When an SDK method is missing, issue calls via `c.HTTPClient().BuildPath(...)` +
 
 ### Record resource
 `opusdns_record` represents a full **RRSet** (all records sharing the same name + type in a zone). The `id` is formatted as `zone_name/name/type`. The `records` attribute is a list of rdata strings.
+
+## Documentation (Terraform Registry)
+
+Registry docs are auto-generated with [`tfplugindocs`](https://github.com/hashicorp/terraform-plugin-docs) via `make generate-docs`. The output lives in `docs/` and **must not be hand-edited** — edit the sources instead:
+
+| What to edit | Location |
+|---|---|
+| Provider index page | `templates/index.md.tmpl` |
+| Resource / data source docs | `templates/resources/<name>.md.tmpl` or `templates/data-sources/<name>.md.tmpl` |
+| Guides | `templates/guides/<name>.md.tmpl` |
+| Example HCL snippets | `examples/resources/<name>/resource.tf` or `examples/data-sources/<name>/data-source.tf` |
+| Schema descriptions | `MarkdownDescription` fields in `internal/provider/*.go` |
+
+After editing any of the above, run:
+
+```sh
+make generate-docs                        # regenerate docs/
+terraform fmt -check -recursive examples/ # ensure HCL is canonical
+```
+
+### Subcategories
+
+Resources and data sources are grouped in the Registry sidebar via the `subcategory` frontmatter in their templates: `DNS`, `Domains`, `Contacts`, `Forwarding`, `Team`.
+
+### Adding a new resource/data source
+
+1. Create the Go implementation in `internal/provider/`
+2. Register it in `provider.go` (`Resources()` / `DataSources()`)
+3. Add an example in `examples/resources/<name>/resource.tf` (or `data-sources/<name>/data-source.tf`)
+4. Optionally create a template in `templates/resources/<name>.md.tmpl` with a `subcategory` and import instructions
+5. Run `make generate-docs` — if no template exists, tfplugindocs auto-generates one
