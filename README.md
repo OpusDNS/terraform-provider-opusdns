@@ -819,7 +819,7 @@ Then run `make install` to build and install the provider binary. With `dev_over
 
 ## License
 
-[Mozilla Public License 2.0](LICENSE)
+[MIT License](LICENSE)
 
 ## Support
 
