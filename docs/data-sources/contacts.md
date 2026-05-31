@@ -33,10 +33,14 @@ output "contact_emails" {
 ### Optional
 
 - `country` (String) Filter by ISO 3166-1 alpha-2 country code.
+- `created_after` (String) Filter contacts created after this RFC3339 timestamp.
+- `created_before` (String) Filter contacts created before this RFC3339 timestamp.
 - `email` (String) Filter by exact email address.
 - `first_name` (String) Filter by exact first name.
 - `last_name` (String) Filter by exact last name.
 - `search` (String) Free-text search over contacts.
+- `tag_ids` (List of String) Filter by tag IDs. Multiple values are sent as repeated `tag_ids` query parameters.
+- `tag_mode` (String) Tag filter mode. Use `match_any` or `match_all` according to the API.
 - `verified` (Boolean) Filter by verification status.
 
 ### Read-Only
