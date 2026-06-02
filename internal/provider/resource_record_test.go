@@ -161,6 +161,13 @@ func TestAccRecordResource_updateTTL(t *testing.T) {
 }
 
 func TestAccRecordResource_NS(t *testing.T) {
+	// SKIP: API regression — PATCH /v1/dns/{zone}/rrsets returns 204 for an
+	// NS rrset at a delegated subdomain, but the rrset is silently absent
+	// from the subsequent GET. This causes the resource to vanish on refresh
+	// and the test fails with a non-empty refresh plan. Re-enable once the
+	// upstream fix lands. See docs/bugs/api-delegated-ns-dropped.md.
+	t.Skip("skipped pending API fix: delegated-subdomain NS rrset is dropped after PATCH; see docs/bugs/api-delegated-ns-dropped.md")
+
 	zoneName := testAccDomainName()
 
 	resource.ParallelTest(t, resource.TestCase{
