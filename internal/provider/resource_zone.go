@@ -172,7 +172,19 @@ func (r *ZoneResource) Create(ctx context.Context, req resource.CreateRequest, r
 		})
 	}
 
-	resp.Diagnostics.Append(populateZoneResourceModel(&data, zone, resolvedName)...)
+	// CreateZone's response omits zone_id, created_on, updated_on, and tags.
+	// Re-read with include=tags so all computed attributes are populated in
+	// state immediately after create (required for ImportStateVerify parity).
+	fullZone, err := r.client.DNS.GetZoneWithOptions(ctx, resolvedName, &models.GetZoneOptions{Include: []models.ZoneIncludeField{models.ZoneIncludeTags}})
+	if err != nil {
+		resp.Diagnostics.AddError("Error reading DNS zone after create", formatAPIError(err))
+		return
+	}
+	if fullZone.Name != "" {
+		resolvedName = canonicalZoneName(fullZone.Name)
+	}
+
+	resp.Diagnostics.Append(populateZoneResourceModel(&data, fullZone, resolvedName)...)
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
