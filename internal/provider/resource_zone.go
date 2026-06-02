@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
@@ -34,8 +35,12 @@ func normalizedDNSSECStatus(status string) types.String {
 // ZoneResourceModel describes the resource data model.
 type ZoneResourceModel struct {
 	ID           fqdnValue    `tfsdk:"id"`
+	ZoneID       types.String `tfsdk:"zone_id"`
 	Name         fqdnValue    `tfsdk:"name"`
 	DNSSECStatus types.String `tfsdk:"dnssec_status"`
+	Tags         types.List   `tfsdk:"tags"`
+	CreatedOn    types.String `tfsdk:"created_on"`
+	UpdatedOn    types.String `tfsdk:"updated_on"`
 }
 
 // NewZoneResource returns a new ZoneResource.
@@ -75,6 +80,13 @@ func (r *ZoneResource) Schema(_ context.Context, _ resource.SchemaRequest, resp 
 					stringplanmodifier.UseStateForUnknown(),
 				},
 			},
+			"zone_id": schema.StringAttribute{
+				Computed:            true,
+				MarkdownDescription: "Server-assigned DNS zone id (`dns_zone_id`).",
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
+			},
 			"name": schema.StringAttribute{
 				CustomType:          fqdnType{},
 				Required:            true,
@@ -87,6 +99,26 @@ func (r *ZoneResource) Schema(_ context.Context, _ resource.SchemaRequest, resp 
 				Optional:            true,
 				Computed:            true,
 				MarkdownDescription: "The DNSSEC status of the zone. Valid values: `enabled`, `disabled`.",
+			},
+			"tags": schema.ListNestedAttribute{
+				Computed:            true,
+				MarkdownDescription: "Tags assigned to the zone. The resource always requests `include=tags` during refresh.",
+				NestedObject: schema.NestedAttributeObject{Attributes: map[string]schema.Attribute{
+					"tag_id": schema.StringAttribute{Computed: true},
+					"label":  schema.StringAttribute{Computed: true},
+					"color":  schema.StringAttribute{Computed: true},
+				}},
+			},
+			"created_on": schema.StringAttribute{
+				Computed:            true,
+				MarkdownDescription: "RFC3339 timestamp when the zone was created.",
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
+			},
+			"updated_on": schema.StringAttribute{
+				Computed:            true,
+				MarkdownDescription: "RFC3339 timestamp when the zone was last updated.",
 			},
 		},
 	}
@@ -140,9 +172,7 @@ func (r *ZoneResource) Create(ctx context.Context, req resource.CreateRequest, r
 		})
 	}
 
-	data.ID = fqdnValue{StringValue: types.StringValue(resolvedName)}
-	data.Name = fqdnValue{StringValue: types.StringValue(resolvedName)}
-	data.DNSSECStatus = normalizedDNSSECStatus(string(zone.DNSSECStatus))
+	resp.Diagnostics.Append(populateZoneResourceModel(&data, zone, resolvedName)...)
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
@@ -165,7 +195,7 @@ func (r *ZoneResource) Read(ctx context.Context, req resource.ReadRequest, resp 
 		return
 	}
 
-	zone, err := r.client.DNS.GetZone(ctx, stateName)
+	zone, err := r.client.DNS.GetZoneWithOptions(ctx, stateName, &models.GetZoneOptions{Include: []models.ZoneIncludeField{models.ZoneIncludeTags}})
 	if err != nil {
 		if isNotFound(err) {
 			resp.State.RemoveResource(ctx)
@@ -183,9 +213,7 @@ func (r *ZoneResource) Read(ctx context.Context, req resource.ReadRequest, resp 
 		apiName = stateName
 	}
 
-	data.ID = fqdnValue{StringValue: types.StringValue(apiName)}
-	data.Name = fqdnValue{StringValue: types.StringValue(apiName)}
-	data.DNSSECStatus = normalizedDNSSECStatus(string(zone.DNSSECStatus))
+	resp.Diagnostics.Append(populateZoneResourceModel(&data, zone, apiName)...)
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
@@ -227,7 +255,7 @@ func (r *ZoneResource) Update(ctx context.Context, req resource.UpdateRequest, r
 	}
 
 	// Re-read current state.
-	zone, err := r.client.DNS.GetZone(ctx, stateName)
+	zone, err := r.client.DNS.GetZoneWithOptions(ctx, stateName, &models.GetZoneOptions{Include: []models.ZoneIncludeField{models.ZoneIncludeTags}})
 	if err != nil {
 		resp.Diagnostics.AddError("Error reading DNS zone after update", formatAPIError(err))
 		return
@@ -241,9 +269,7 @@ func (r *ZoneResource) Update(ctx context.Context, req resource.UpdateRequest, r
 		apiName = stateName
 	}
 
-	plan.ID = fqdnValue{StringValue: types.StringValue(apiName)}
-	plan.Name = fqdnValue{StringValue: types.StringValue(apiName)}
-	plan.DNSSECStatus = normalizedDNSSECStatus(string(zone.DNSSECStatus))
+	resp.Diagnostics.Append(populateZoneResourceModel(&plan, zone, apiName)...)
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
@@ -304,11 +330,22 @@ func (r *ZoneResource) ImportState(ctx context.Context, req resource.ImportState
 		resolvedName = canonicalZoneName(req.ID)
 	}
 
-	data := ZoneResourceModel{
-		ID:           fqdnValue{StringValue: types.StringValue(resolvedName)},
-		Name:         fqdnValue{StringValue: types.StringValue(resolvedName)},
-		DNSSECStatus: normalizedDNSSECStatus(string(zone.DNSSECStatus)),
-	}
+	data := ZoneResourceModel{}
+	resp.Diagnostics.Append(populateZoneResourceModel(&data, zone, resolvedName)...)
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
+}
+
+func populateZoneResourceModel(data *ZoneResourceModel, zone *models.Zone, name string) diag.Diagnostics {
+	var diags diag.Diagnostics
+	data.ID = fqdnValue{StringValue: types.StringValue(name)}
+	data.ZoneID = types.StringValue(string(zone.ZoneID))
+	data.Name = fqdnValue{StringValue: types.StringValue(name)}
+	data.DNSSECStatus = normalizedDNSSECStatus(string(zone.DNSSECStatus))
+	data.CreatedOn = timePtrToValue(zone.CreatedOn)
+	data.UpdatedOn = timePtrToValue(zone.UpdatedOn)
+	tags, d := tagEnrichedListValue(zone.Tags)
+	diags.Append(d...)
+	data.Tags = tags
+	return diags
 }

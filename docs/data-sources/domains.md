@@ -32,14 +32,29 @@ output "domain_names" {
 
 ### Optional
 
+- `created_after` (String) Filter domains created after this RFC3339 timestamp.
+- `created_before` (String) Filter domains created before this RFC3339 timestamp.
+- `expires_after` (String) Filter domains expiring after this RFC3339 timestamp.
+- `expires_before` (String) Filter domains expiring before this RFC3339 timestamp.
+- `expires_in_30_days` (Boolean) Filter domains expiring within 30 days.
+- `expires_in_60_days` (Boolean) Filter domains expiring within 60 days.
+- `expires_in_90_days` (Boolean) Filter domains expiring within 90 days.
+- `include_tags` (Boolean) When true, request `include=tags` and populate the computed `tags` field for each domain.
 - `is_premium` (Boolean) Filter by premium classification.
 - `name` (String) Filter by exact fully-qualified domain name.
+- `registered_after` (String) Filter domains registered after this RFC3339 timestamp.
+- `registered_before` (String) Filter domains registered before this RFC3339 timestamp.
+- `registry_statuses_in` (List of String) Filter by registry statuses. Multiple values are sent as repeated API parameters.
 - `renewal_mode` (String) Filter by renewal mode (`renew` or `expire`).
 - `search` (String) Free-text search over domain names.
 - `sld` (String) Filter by second-level domain.
 - `status` (String) Filter by domain lifecycle status (e.g. `ok`, `pendingTransfer`).
+- `tag_ids` (List of String) Filter by tag IDs. Multiple values are sent as repeated `tag_ids` query parameters.
+- `tag_mode` (String) Tag filter mode. Use `match_any` or `match_all` according to the API.
 - `tld` (String) Filter by top-level domain.
 - `transfer_lock` (Boolean) Filter by transfer-lock status.
+- `updated_after` (String) Filter domains updated after this RFC3339 timestamp.
+- `updated_before` (String) Filter domains updated before this RFC3339 timestamp.
 
 ### Read-Only
 
@@ -65,6 +80,7 @@ Read-Only:
 - `registry_statuses` (List of String)
 - `renewal_mode` (String)
 - `sld` (String)
+- `tags` (Attributes List) Tags assigned to the domain when `include_tags` is true. (see [below for nested schema](#nestedatt--domains--tags))
 - `tld` (String)
 - `transfer_lock` (Boolean)
 - `updated_on` (String)
@@ -76,3 +92,13 @@ Read-Only:
 
 - `hostname` (String)
 - `ip_addresses` (List of String)
+
+
+<a id="nestedatt--domains--tags"></a>
+### Nested Schema for `domains.tags`
+
+Read-Only:
+
+- `color` (String)
+- `label` (String)
+- `tag_id` (String)

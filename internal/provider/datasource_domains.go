@@ -7,6 +7,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/opusdns/opusdns-go-client/models"
 	"github.com/opusdns/opusdns-go-client/opusdns"
@@ -25,16 +26,31 @@ type DomainsDataSource struct {
 // DomainsDataSourceModel exposes the most useful server-side filters as
 // inputs and a `domains` list of fully-populated objects as the result.
 type DomainsDataSourceModel struct {
-	ID           types.String `tfsdk:"id"`
-	Search       types.String `tfsdk:"search"`
-	Name         types.String `tfsdk:"name"`
-	TLD          types.String `tfsdk:"tld"`
-	SLD          types.String `tfsdk:"sld"`
-	Status       types.String `tfsdk:"status"`
-	RenewalMode  types.String `tfsdk:"renewal_mode"`
-	TransferLock types.Bool   `tfsdk:"transfer_lock"`
-	IsPremium    types.Bool   `tfsdk:"is_premium"`
-	Domains      types.List   `tfsdk:"domains"`
+	ID                 types.String `tfsdk:"id"`
+	Search             types.String `tfsdk:"search"`
+	Name               types.String `tfsdk:"name"`
+	TLD                types.String `tfsdk:"tld"`
+	SLD                types.String `tfsdk:"sld"`
+	Status             types.String `tfsdk:"status"`
+	RenewalMode        types.String `tfsdk:"renewal_mode"`
+	TransferLock       types.Bool   `tfsdk:"transfer_lock"`
+	IsPremium          types.Bool   `tfsdk:"is_premium"`
+	TagIDs             types.List   `tfsdk:"tag_ids"`
+	TagMode            types.String `tfsdk:"tag_mode"`
+	IncludeTags        types.Bool   `tfsdk:"include_tags"`
+	CreatedAfter       types.String `tfsdk:"created_after"`
+	CreatedBefore      types.String `tfsdk:"created_before"`
+	UpdatedAfter       types.String `tfsdk:"updated_after"`
+	UpdatedBefore      types.String `tfsdk:"updated_before"`
+	ExpiresAfter       types.String `tfsdk:"expires_after"`
+	ExpiresBefore      types.String `tfsdk:"expires_before"`
+	ExpiresIn30Days    types.Bool   `tfsdk:"expires_in_30_days"`
+	ExpiresIn60Days    types.Bool   `tfsdk:"expires_in_60_days"`
+	ExpiresIn90Days    types.Bool   `tfsdk:"expires_in_90_days"`
+	RegisteredAfter    types.String `tfsdk:"registered_after"`
+	RegisteredBefore   types.String `tfsdk:"registered_before"`
+	RegistryStatusesIn types.List   `tfsdk:"registry_statuses_in"`
+	Domains            types.List   `tfsdk:"domains"`
 }
 
 // domainItemAttrTypes describes the per-item shape used in the `domains`
@@ -52,6 +68,7 @@ var domainItemAttrTypes = map[string]attr.Type{
 	"nameservers":          types.ListType{ElemType: types.ObjectType{AttrTypes: nameserverAttrTypes}},
 	"contacts":             types.MapType{ElemType: contactsMapElemType},
 	"registry_statuses":    types.ListType{ElemType: types.StringType},
+	"tags":                 types.ListType{ElemType: types.ObjectType{AttrTypes: tagEnrichedAttrTypes}},
 	"auth_code_expires_on": types.StringType,
 	"registered_on":        types.StringType,
 	"expires_on":           types.StringType,
@@ -82,6 +99,38 @@ func (d *DomainsDataSource) Schema(_ context.Context, _ datasource.SchemaRequest
 			"renewal_mode":  schema.StringAttribute{Optional: true, MarkdownDescription: "Filter by renewal mode (`renew` or `expire`)."},
 			"transfer_lock": schema.BoolAttribute{Optional: true, MarkdownDescription: "Filter by transfer-lock status."},
 			"is_premium":    schema.BoolAttribute{Optional: true, MarkdownDescription: "Filter by premium classification."},
+			"tag_ids": schema.ListAttribute{
+				Optional:            true,
+				ElementType:         types.StringType,
+				MarkdownDescription: "Filter by tag IDs. Multiple values are sent as repeated `tag_ids` query parameters.",
+			},
+			"tag_mode":       schema.StringAttribute{Optional: true, MarkdownDescription: "Tag filter mode. Use `match_any` or `match_all` according to the API."},
+			"include_tags":   schema.BoolAttribute{Optional: true, MarkdownDescription: "When true, request `include=tags` and populate the computed `tags` field for each domain."},
+			"created_after":  schema.StringAttribute{Optional: true, MarkdownDescription: "Filter domains created after this RFC3339 timestamp."},
+			"created_before": schema.StringAttribute{Optional: true, MarkdownDescription: "Filter domains created before this RFC3339 timestamp."},
+			"updated_after":  schema.StringAttribute{Optional: true, MarkdownDescription: "Filter domains updated after this RFC3339 timestamp."},
+			"updated_before": schema.StringAttribute{Optional: true, MarkdownDescription: "Filter domains updated before this RFC3339 timestamp."},
+			"expires_after":  schema.StringAttribute{Optional: true, MarkdownDescription: "Filter domains expiring after this RFC3339 timestamp."},
+			"expires_before": schema.StringAttribute{Optional: true, MarkdownDescription: "Filter domains expiring before this RFC3339 timestamp."},
+			"expires_in_30_days": schema.BoolAttribute{
+				Optional:            true,
+				MarkdownDescription: "Filter domains expiring within 30 days.",
+			},
+			"expires_in_60_days": schema.BoolAttribute{
+				Optional:            true,
+				MarkdownDescription: "Filter domains expiring within 60 days.",
+			},
+			"expires_in_90_days": schema.BoolAttribute{
+				Optional:            true,
+				MarkdownDescription: "Filter domains expiring within 90 days.",
+			},
+			"registered_after":  schema.StringAttribute{Optional: true, MarkdownDescription: "Filter domains registered after this RFC3339 timestamp."},
+			"registered_before": schema.StringAttribute{Optional: true, MarkdownDescription: "Filter domains registered before this RFC3339 timestamp."},
+			"registry_statuses_in": schema.ListAttribute{
+				Optional:            true,
+				ElementType:         types.StringType,
+				MarkdownDescription: "Filter by registry statuses. Multiple values are sent as repeated API parameters.",
+			},
 
 			"domains": schema.ListNestedAttribute{
 				Computed:            true,
@@ -106,8 +155,17 @@ func (d *DomainsDataSource) Schema(_ context.Context, _ datasource.SchemaRequest
 								},
 							},
 						},
-						"contacts":             schema.MapAttribute{Computed: true, ElementType: contactsMapElemType},
-						"registry_statuses":    schema.ListAttribute{Computed: true, ElementType: types.StringType},
+						"contacts":          schema.MapAttribute{Computed: true, ElementType: contactsMapElemType},
+						"registry_statuses": schema.ListAttribute{Computed: true, ElementType: types.StringType},
+						"tags": schema.ListNestedAttribute{
+							Computed:            true,
+							MarkdownDescription: "Tags assigned to the domain when `include_tags` is true.",
+							NestedObject: schema.NestedAttributeObject{Attributes: map[string]schema.Attribute{
+								"tag_id": schema.StringAttribute{Computed: true},
+								"label":  schema.StringAttribute{Computed: true},
+								"color":  schema.StringAttribute{Computed: true},
+							}},
+						},
 						"auth_code_expires_on": schema.StringAttribute{Computed: true},
 						"registered_on":        schema.StringAttribute{Computed: true},
 						"expires_on":           schema.StringAttribute{Computed: true},
@@ -163,6 +221,76 @@ func (d *DomainsDataSource) Read(ctx context.Context, req datasource.ReadRequest
 		v := data.IsPremium.ValueBool()
 		opts.IsPremium = &v
 	}
+	if !data.TagIDs.IsNull() && !data.TagIDs.IsUnknown() {
+		raw, diags := stringListValueToStrings(ctx, data.TagIDs)
+		resp.Diagnostics.Append(diags...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
+		opts.TagIDs = make([]models.TagID, 0, len(raw))
+		for _, id := range raw {
+			opts.TagIDs = append(opts.TagIDs, models.TagID(id))
+		}
+	}
+	if !data.TagMode.IsNull() && !data.TagMode.IsUnknown() {
+		opts.TagMode = models.TagFilterMode(data.TagMode.ValueString())
+	}
+	if !data.IncludeTags.IsNull() && !data.IncludeTags.IsUnknown() && data.IncludeTags.ValueBool() {
+		opts.Include = append(opts.Include, models.DomainIncludeTags)
+	}
+	var diags diag.Diagnostics
+	if opts.CreatedAfter, diags = parseOptionalRFC3339(data.CreatedAfter, "created_after"); diags.HasError() {
+		resp.Diagnostics.Append(diags...)
+		return
+	}
+	if opts.CreatedBefore, diags = parseOptionalRFC3339(data.CreatedBefore, "created_before"); diags.HasError() {
+		resp.Diagnostics.Append(diags...)
+		return
+	}
+	if opts.UpdatedAfter, diags = parseOptionalRFC3339(data.UpdatedAfter, "updated_after"); diags.HasError() {
+		resp.Diagnostics.Append(diags...)
+		return
+	}
+	if opts.UpdatedBefore, diags = parseOptionalRFC3339(data.UpdatedBefore, "updated_before"); diags.HasError() {
+		resp.Diagnostics.Append(diags...)
+		return
+	}
+	if opts.ExpiresAfter, diags = parseOptionalRFC3339(data.ExpiresAfter, "expires_after"); diags.HasError() {
+		resp.Diagnostics.Append(diags...)
+		return
+	}
+	if opts.ExpiresBefore, diags = parseOptionalRFC3339(data.ExpiresBefore, "expires_before"); diags.HasError() {
+		resp.Diagnostics.Append(diags...)
+		return
+	}
+	if opts.RegisteredAfter, diags = parseOptionalRFC3339(data.RegisteredAfter, "registered_after"); diags.HasError() {
+		resp.Diagnostics.Append(diags...)
+		return
+	}
+	if opts.RegisteredBefore, diags = parseOptionalRFC3339(data.RegisteredBefore, "registered_before"); diags.HasError() {
+		resp.Diagnostics.Append(diags...)
+		return
+	}
+	if !data.ExpiresIn30Days.IsNull() && !data.ExpiresIn30Days.IsUnknown() {
+		v := data.ExpiresIn30Days.ValueBool()
+		opts.ExpiresIn30Days = &v
+	}
+	if !data.ExpiresIn60Days.IsNull() && !data.ExpiresIn60Days.IsUnknown() {
+		v := data.ExpiresIn60Days.ValueBool()
+		opts.ExpiresIn60Days = &v
+	}
+	if !data.ExpiresIn90Days.IsNull() && !data.ExpiresIn90Days.IsUnknown() {
+		v := data.ExpiresIn90Days.ValueBool()
+		opts.ExpiresIn90Days = &v
+	}
+	if !data.RegistryStatusesIn.IsNull() && !data.RegistryStatusesIn.IsUnknown() {
+		raw, diags := stringListValueToStrings(ctx, data.RegistryStatusesIn)
+		resp.Diagnostics.Append(diags...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
+		opts.RegistryStatuses = raw
+	}
 
 	domains, err := d.client.Domains.ListDomains(ctx, opts)
 	if err != nil {
@@ -190,6 +318,11 @@ func (d *DomainsDataSource) Read(ctx context.Context, req datasource.ReadRequest
 		if resp.Diagnostics.HasError() {
 			return
 		}
+		tagsList, td := tagEnrichedListValue(dn.Tags)
+		resp.Diagnostics.Append(td...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
 
 		renewalMode := types.StringNull()
 		if dn.RenewalMode != "" {
@@ -209,6 +342,7 @@ func (d *DomainsDataSource) Read(ctx context.Context, req datasource.ReadRequest
 			"nameservers":          nsList,
 			"contacts":             cMap,
 			"registry_statuses":    statusList,
+			"tags":                 tagsList,
 			"auth_code_expires_on": timePtrToValue(dn.AuthCodeExpiresOn),
 			"registered_on":        timePtrToValue(dn.RegisteredOn),
 			"expires_on":           timePtrToValue(dn.ExpiresOn),
