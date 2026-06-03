@@ -8,7 +8,6 @@ Changes since commit `d52165a` ("Merge pull request #52 from OpusDNS/update-read
 
 ### Added
 
-- **New data sources `opusdns_organization_ip_restriction` and `opusdns_organization_ip_restrictions`** — read organization-level IP allow/deny restrictions. Creation, update, and deletion of these restrictions remains web-interface only.
 - **New data source `opusdns_report`** — retrieve a single report by id.
 - **New data source `opusdns_reports`** — list reports with server-side filtering.
 - **New data source `opusdns_tld_portfolio`** — list the organization's TLD portfolio (`GET /v1/tlds/portfolio`). Implemented against the raw HTTP client because the SDK's `TLDs.GetPortfolio` expects a wrapper object while the API returns a bare array.
