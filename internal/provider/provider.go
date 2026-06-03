@@ -114,7 +114,6 @@ func (p *OpusDNSProvider) Resources(_ context.Context) []func() resource.Resourc
 		NewRegistrarCredentialResource,
 		NewContactAttributeSetResource,
 		NewContactAttributeLinkResource,
-		NewOrganizationIPRestrictionResource,
 	}
 }
 
@@ -154,8 +153,6 @@ func (p *OpusDNSProvider) DataSources(_ context.Context) []func() datasource.Dat
 		NewContactAttributeSetDataSource,
 		NewContactAttributeSetsDataSource,
 		NewRolesDataSource,
-		NewOrganizationIPRestrictionDataSource,
-		NewOrganizationIPRestrictionsDataSource,
 		NewReportDataSource,
 		NewReportsDataSource,
 		NewTLDPortfolioDataSource,
