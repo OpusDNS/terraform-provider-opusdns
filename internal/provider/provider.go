@@ -114,7 +114,6 @@ func (p *OpusDNSProvider) Resources(_ context.Context) []func() resource.Resourc
 		NewRegistrarCredentialResource,
 		NewContactAttributeSetResource,
 		NewContactAttributeLinkResource,
-		NewOrganizationIPRestrictionResource,
 	}
 }
 
