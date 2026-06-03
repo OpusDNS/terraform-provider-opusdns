@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"strconv"
 	"strings"
 	"time"
 
@@ -132,10 +131,6 @@ func intPtrToValue(i *int) types.Int64 {
 		return types.Int64Null()
 	}
 	return types.Int64Value(int64(*i))
-}
-
-func intToStringValue(i int) types.String {
-	return types.StringValue(strconv.Itoa(i))
 }
 
 func stringListValueToStrings(ctx context.Context, list types.List) ([]string, diag.Diagnostics) {
