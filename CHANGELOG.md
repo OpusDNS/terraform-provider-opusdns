@@ -4,7 +4,29 @@ All notable changes to this provider are documented in this file.
 
 ## Unreleased
 
-Changes since commit `d52165a` ("Merge pull request #52 from OpusDNS/update-readme-fix-license").
+Changes on branch `remove-organization-ip-restriction-resource` (since `v1.0.4`).
+
+### Removed
+
+- **Resource `opusdns_organization_ip_restriction`** (commit `5caacc7`). Organization IP restrictions are managed exclusively through the OpusDNS web interface.
+- **Data sources `opusdns_organization_ip_restriction` and `opusdns_organization_ip_restrictions`** (commit `6080ad4`). Same rationale as the resource removal — there is no Terraform-side use case for reading these either.
+- Associated documentation under `docs/resources/` and `docs/data-sources/`, example modules under `examples/`, and template files under `templates/`.
+
+### Added
+
+- **`EXCLUDED_API_FEATURES.md`** (commit `2a40f77`) — reference file listing API surface area that must not be implemented as Terraform resources or data sources. Future API-sync audits must consult this file before adding new coverage. Seeded with the organization IP restrictions entry.
+
+## v1.0.4 — 2026-06-03
+
+### Fixed
+
+- `opusdns_zone` resource: refresh full state immediately after `Create` via `GetZoneWithOptions(..., include=tags)`. The API's `CreateZone` response omits `zone_id`, `created_on`, `updated_on`, and `tags`, which previously broke `ImportStateVerify` parity in `TestAccZoneResource_basic`.
+
+### Changed
+
+- Skip `TestAccRecordResource_NS` pending an upstream API fix. `PATCH /v1/dns/{zone}/rrsets` for an NS rrset at a delegated subdomain returns 204 but the rrset is silently absent from the subsequent `GET`, causing a perpetual refresh-plan drift. Full repro lives in `docs/bugs/api-delegated-ns-dropped.md`.
+
+## v1.0.2 — 2026-06-03
 
 ### Added
 
