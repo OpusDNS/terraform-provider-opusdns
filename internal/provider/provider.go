@@ -164,6 +164,11 @@ func (p *OpusDNSProvider) DataSources(_ context.Context) []func() datasource.Dat
 		NewRequestHistoryDataSource,
 		NewObjectLogsDataSource,
 		NewEmailForwardLogsDataSource,
+		NewOrganizationAttributesDataSource,
+		NewOrganizationTransactionsDataSource,
+		NewOrganizationTransactionDataSource,
+		NewOrganizationInvoicesDataSource,
+		NewOrganizationPricingDataSource,
 	}
 }
 

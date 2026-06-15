@@ -14,6 +14,12 @@ Changes on branch `remove-organization-ip-restriction-resource` (since `v1.0.4`)
 
 ### Added
 
+- **New data source `opusdns_organization_attributes`** — read organization-level key/value attributes (`GET /v1/organizations/attributes` or `.../{organization_id}/attributes`). Either set `organization_id`, set `me = true`, or leave both unset to hit the caller-org endpoint. Optional `keys` filter narrows the response. Arbitrary JSON values are surfaced as a string in `value_json` (decode with `jsondecode()`).
+- **New data source `opusdns_organization_transactions`** — list billing transactions with server-side filters (product_type, action, status, created window) and pagination.
+- **New data source `opusdns_organization_transaction`** — fetch a single billing transaction by id.
+- **New data source `opusdns_organization_invoices`** — list invoices from `GET /v1/organizations/{organization_id}/billing/invoices` with pagination. Money fields are surfaced as decimal strings to preserve precision.
+- **New data source `opusdns_organization_pricing`** — read product prices from `GET /v1/organizations/{organization_id}/pricing/product-type/{product_type}`. Optional `product_action` / `product_class` query parameters narrow the response. Money fields are surfaced as decimal strings.
+- **`opusdns-go-client` v1.0.10 SDK drift documented** in `docs/bugs/sdk-organizations-billing-pricing-drift.md`. The attributes / invoices / pricing SDK helpers build wrong paths and/or expect wrong response shapes; the new data sources bypass them via the raw HTTP client (same pattern used for `opusdns_tld_portfolio`).
 - **New data source `opusdns_request_history`** — list API request history entries (`GET /v1/archive/request-history`) with server-side filters (method/path/status-code range/duration range/actor/time window) and pagination.
 - **New data source `opusdns_object_logs`** — list object change-log entries (`GET /v1/archive/object-logs`) with server-side filters (object_type/object_id/action/user/time window) and pagination. The dynamic `changes` payload is surfaced as JSON via `changes_json` (decode with `jsondecode()`).
 - **New data source `opusdns_email_forward_logs`** — list email-forward delivery logs. Set either `email_forward_id` (reads `GET /v1/archive/email-forward-logs/{id}`) or `email_forward_alias_id` (reads `GET /v1/archive/email-forward-logs/aliases/{id}`). Exactly one must be provided.
