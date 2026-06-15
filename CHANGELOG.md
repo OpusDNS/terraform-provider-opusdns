@@ -14,7 +14,11 @@ Changes on branch `remove-organization-ip-restriction-resource` (since `v1.0.4`)
 
 ### Added
 
+- **New data source `opusdns_request_history`** — list API request history entries (`GET /v1/archive/request-history`) with server-side filters (method/path/status-code range/duration range/actor/time window) and pagination.
+- **New data source `opusdns_object_logs`** — list object change-log entries (`GET /v1/archive/object-logs`) with server-side filters (object_type/object_id/action/user/time window) and pagination. The dynamic `changes` payload is surfaced as JSON via `changes_json` (decode with `jsondecode()`).
+- **New data source `opusdns_email_forward_logs`** — list email-forward delivery logs. Set either `email_forward_id` (reads `GET /v1/archive/email-forward-logs/{id}`) or `email_forward_alias_id` (reads `GET /v1/archive/email-forward-logs/aliases/{id}`). Exactly one must be provided.
 - **`EXCLUDED_API_FEATURES.md`** (commit `2a40f77`) — reference file listing API surface area that must not be implemented as Terraform resources or data sources. Future API-sync audits must consult this file before adding new coverage. Seeded with the organization IP restrictions entry.
+- Generated documentation under `docs/data-sources/` for the new archive data sources and for several v1.0.2 data sources that previously lacked rendered docs (`event`, `events`, `tld_portfolio`, `zones_summary`, `domains_summary`, `domain_suggestions`).
 
 ## v1.0.4 — 2026-06-03
 
