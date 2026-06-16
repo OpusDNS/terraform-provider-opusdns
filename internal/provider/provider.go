@@ -153,6 +153,14 @@ func (p *OpusDNSProvider) DataSources(_ context.Context) []func() datasource.Dat
 		NewContactAttributeSetDataSource,
 		NewContactAttributeSetsDataSource,
 		NewRolesDataSource,
+		NewReportDataSource,
+		NewReportsDataSource,
+		NewTLDPortfolioDataSource,
+		NewZonesSummaryDataSource,
+		NewDomainsSummaryDataSource,
+		NewDomainSuggestionsDataSource,
+		NewEventDataSource,
+		NewEventsDataSource,
 	}
 }
 

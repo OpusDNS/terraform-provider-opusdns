@@ -7,6 +7,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/opusdns/opusdns-go-client/models"
 	"github.com/opusdns/opusdns-go-client/opusdns"
 )
 
@@ -21,8 +22,13 @@ type ZoneDataSource struct {
 // ZoneDataSourceModel describes the data source data model.
 type ZoneDataSourceModel struct {
 	ID           fqdnValue    `tfsdk:"id"`
+	ZoneID       types.String `tfsdk:"zone_id"`
 	Name         fqdnValue    `tfsdk:"name"`
 	DNSSECStatus types.String `tfsdk:"dnssec_status"`
+	IncludeTags  types.Bool   `tfsdk:"include_tags"`
+	Tags         types.List   `tfsdk:"tags"`
+	CreatedOn    types.String `tfsdk:"created_on"`
+	UpdatedOn    types.String `tfsdk:"updated_on"`
 }
 
 // NewZoneDataSource returns a new ZoneDataSource.
@@ -43,6 +49,10 @@ func (d *ZoneDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, r
 				Computed:            true,
 				MarkdownDescription: "The zone name (used as the unique identifier).",
 			},
+			"zone_id": schema.StringAttribute{
+				Computed:            true,
+				MarkdownDescription: "Server-assigned DNS zone id (`dns_zone_id`).",
+			},
 			"name": schema.StringAttribute{
 				CustomType:          fqdnType{},
 				Required:            true,
@@ -52,6 +62,18 @@ func (d *ZoneDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, r
 				Computed:            true,
 				MarkdownDescription: "The DNSSEC status of the zone (`enabled` or `disabled`).",
 			},
+			"include_tags": schema.BoolAttribute{Optional: true, MarkdownDescription: "When true, request `include=tags` and populate `tags` in state."},
+			"tags": schema.ListNestedAttribute{
+				Computed:            true,
+				MarkdownDescription: "Tags assigned to the zone when `include_tags` is true.",
+				NestedObject: schema.NestedAttributeObject{Attributes: map[string]schema.Attribute{
+					"tag_id": schema.StringAttribute{Computed: true},
+					"label":  schema.StringAttribute{Computed: true},
+					"color":  schema.StringAttribute{Computed: true},
+				}},
+			},
+			"created_on": schema.StringAttribute{Computed: true, MarkdownDescription: "RFC3339 timestamp when the zone was created."},
+			"updated_on": schema.StringAttribute{Computed: true, MarkdownDescription: "RFC3339 timestamp when the zone was last updated."},
 		},
 	}
 }
@@ -78,7 +100,13 @@ func (d *ZoneDataSource) Read(ctx context.Context, req datasource.ReadRequest, r
 		return
 	}
 
-	zone, err := d.client.DNS.GetZone(ctx, data.Name.ValueString())
+	var zone *models.Zone
+	var err error
+	if !data.IncludeTags.IsNull() && !data.IncludeTags.IsUnknown() && data.IncludeTags.ValueBool() {
+		zone, err = d.client.DNS.GetZoneWithOptions(ctx, data.Name.ValueString(), &models.GetZoneOptions{Include: []models.ZoneIncludeField{models.ZoneIncludeTags}})
+	} else {
+		zone, err = d.client.DNS.GetZone(ctx, data.Name.ValueString())
+	}
 	if err != nil {
 		resp.Diagnostics.AddError("Error reading DNS zone", formatAPIError(err))
 		return
@@ -86,8 +114,14 @@ func (d *ZoneDataSource) Read(ctx context.Context, req datasource.ReadRequest, r
 
 	resolvedName := canonicalZoneName(zone.Name)
 	data.ID = fqdnValue{StringValue: types.StringValue(resolvedName)}
+	data.ZoneID = types.StringValue(string(zone.ZoneID))
 	data.Name = fqdnValue{StringValue: types.StringValue(resolvedName)}
 	data.DNSSECStatus = normalizedDNSSECStatus(string(zone.DNSSECStatus))
+	tagList, diags := tagEnrichedListValue(zone.Tags)
+	resp.Diagnostics.Append(diags...)
+	data.Tags = tagList
+	data.CreatedOn = timePtrToValue(zone.CreatedOn)
+	data.UpdatedOn = timePtrToValue(zone.UpdatedOn)
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }

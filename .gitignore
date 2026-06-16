@@ -18,3 +18,4 @@ terraform-provider-opusdns_*
 
 # OS
 .DS_Store
+/.envrc

@@ -7,6 +7,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/opusdns/opusdns-go-client/models"
 	"github.com/opusdns/opusdns-go-client/opusdns"
 )
 
@@ -37,6 +38,8 @@ type DomainDataSourceModel struct {
 	Nameservers       types.List   `tfsdk:"nameservers"`
 	Contacts          types.Map    `tfsdk:"contacts"`
 	RegistryStatuses  types.List   `tfsdk:"registry_statuses"`
+	IncludeTags       types.Bool   `tfsdk:"include_tags"`
+	Tags              types.List   `tfsdk:"tags"`
 	AuthCodeExpiresOn types.String `tfsdk:"auth_code_expires_on"`
 	RegisteredOn      types.String `tfsdk:"registered_on"`
 	ExpiresOn         types.String `tfsdk:"expires_on"`
@@ -82,7 +85,17 @@ func (d *DomainDataSource) Schema(_ context.Context, _ datasource.SchemaRequest,
 				ElementType:         contactsMapElemType,
 				MarkdownDescription: "Contacts grouped by type (`registrant`, `admin`, `tech`, `billing`).",
 			},
-			"registry_statuses":    schema.ListAttribute{Computed: true, ElementType: types.StringType},
+			"registry_statuses": schema.ListAttribute{Computed: true, ElementType: types.StringType},
+			"include_tags":      schema.BoolAttribute{Optional: true, MarkdownDescription: "When true, request `include=tags` and populate `tags` in state."},
+			"tags": schema.ListNestedAttribute{
+				Computed:            true,
+				MarkdownDescription: "Tags assigned to the domain when `include_tags` is true.",
+				NestedObject: schema.NestedAttributeObject{Attributes: map[string]schema.Attribute{
+					"tag_id": schema.StringAttribute{Computed: true},
+					"label":  schema.StringAttribute{Computed: true},
+					"color":  schema.StringAttribute{Computed: true},
+				}},
+			},
 			"auth_code_expires_on": schema.StringAttribute{Computed: true},
 			"registered_on":        schema.StringAttribute{Computed: true},
 			"expires_on":           schema.StringAttribute{Computed: true},
@@ -114,41 +127,51 @@ func (d *DomainDataSource) Read(ctx context.Context, req datasource.ReadRequest,
 		return
 	}
 
-	domain, err := d.client.Domains.GetDomain(ctx, data.DomainRef.ValueString())
+	var domain *models.Domain
+	var err error
+	if !data.IncludeTags.IsNull() && !data.IncludeTags.IsUnknown() && data.IncludeTags.ValueBool() {
+		domain, err = d.client.Domains.GetDomainWithOptions(ctx, data.DomainRef.ValueString(), &models.GetDomainOptions{Include: []models.DomainIncludeField{models.DomainIncludeTags}})
+	} else {
+		domain, err = d.client.Domains.GetDomain(ctx, data.DomainRef.ValueString())
+	}
 	if err != nil {
 		resp.Diagnostics.AddError("Error reading domain", formatAPIError(err))
 		return
 	}
+	dn := domain
 
-	data.ID = types.StringValue(string(domain.DomainID))
-	data.DomainID = types.StringValue(string(domain.DomainID))
-	data.Name = types.StringValue(domain.Name)
-	data.SLD = types.StringValue(domain.SLD)
-	data.TLD = types.StringValue(domain.TLD)
-	data.OwnerID = types.StringValue(string(domain.OwnerID))
-	data.RegistryAccountID = types.StringValue(string(domain.RegistryAccountID))
-	data.IsPremium = types.BoolValue(domain.IsPremium)
-	data.AuthCodeExpiresOn = timePtrToValue(domain.AuthCodeExpiresOn)
-	data.RegisteredOn = timePtrToValue(domain.RegisteredOn)
-	data.ExpiresOn = timePtrToValue(domain.ExpiresOn)
-	data.CreatedOn = timePtrToValue(domain.CreatedOn)
-	data.UpdatedOn = timePtrToValue(domain.UpdatedOn)
-	if domain.RenewalMode != "" {
-		data.RenewalMode = types.StringValue(string(domain.RenewalMode))
+	data.ID = types.StringValue(string(dn.DomainID))
+	data.DomainID = types.StringValue(string(dn.DomainID))
+	data.Name = types.StringValue(dn.Name)
+	data.SLD = types.StringValue(dn.SLD)
+	data.TLD = types.StringValue(dn.TLD)
+	data.OwnerID = types.StringValue(string(dn.OwnerID))
+	data.RegistryAccountID = types.StringValue(string(dn.RegistryAccountID))
+	data.IsPremium = types.BoolValue(dn.IsPremium)
+	data.AuthCodeExpiresOn = timePtrToValue(dn.AuthCodeExpiresOn)
+	data.RegisteredOn = timePtrToValue(dn.RegisteredOn)
+	data.ExpiresOn = timePtrToValue(dn.ExpiresOn)
+	data.CreatedOn = timePtrToValue(dn.CreatedOn)
+	data.UpdatedOn = timePtrToValue(dn.UpdatedOn)
+	if dn.RenewalMode != "" {
+		data.RenewalMode = types.StringValue(string(dn.RenewalMode))
 	} else {
 		data.RenewalMode = types.StringNull()
 	}
-	data.TransferLock = types.BoolValue(domainHasClientTransferProhibited(domain))
+	data.TransferLock = types.BoolValue(domainHasClientTransferProhibited(dn))
 
-	statusList, sd := stringSliceToList(domain.RegistryStatuses)
+	statusList, sd := stringSliceToList(dn.RegistryStatuses)
 	resp.Diagnostics.Append(sd...)
 	data.RegistryStatuses = statusList
+	tagList, td := tagEnrichedListValue(dn.Tags)
+	resp.Diagnostics.Append(td...)
+	data.Tags = tagList
 
-	nsList, nd := nameserversAPIToList(ctx, domain.Nameservers)
+	nsList, nd := nameserversAPIToList(ctx, dn.Nameservers)
 	resp.Diagnostics.Append(nd...)
 	data.Nameservers = nsList
 
-	cMap, cd := contactsAPIToMap(domain.Contacts, nil)
+	cMap, cd := contactsAPIToMap(dn.Contacts, nil)
 	resp.Diagnostics.Append(cd...)
 	data.Contacts = cMap
 

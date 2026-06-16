@@ -8,8 +8,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/opusdns/opusdns-go-client/models"
 	"github.com/opusdns/opusdns-go-client/opusdns"
 )
 
@@ -122,6 +124,65 @@ func timePtrToValue(t *time.Time) types.String {
 		return types.StringNull()
 	}
 	return types.StringValue(t.Format(time.RFC3339))
+}
+
+func intPtrToValue(i *int) types.Int64 {
+	if i == nil {
+		return types.Int64Null()
+	}
+	return types.Int64Value(int64(*i))
+}
+
+func stringListValueToStrings(ctx context.Context, list types.List) ([]string, diag.Diagnostics) {
+	var out []string
+	if list.IsNull() || list.IsUnknown() {
+		return out, nil
+	}
+	diags := list.ElementsAs(ctx, &out, false)
+	return out, diags
+}
+
+func parseOptionalRFC3339(value types.String, name string) (*time.Time, diag.Diagnostics) {
+	var diags diag.Diagnostics
+	if value.IsNull() || value.IsUnknown() {
+		return nil, diags
+	}
+	parsed, err := time.Parse(time.RFC3339, value.ValueString())
+	if err != nil {
+		diags.AddError(
+			"Invalid RFC3339 timestamp",
+			fmt.Sprintf("%s must be an RFC3339 timestamp such as 2026-05-31T12:00:00Z: %s", name, err),
+		)
+		return nil, diags
+	}
+	return &parsed, diags
+}
+
+var tagEnrichedAttrTypes = map[string]attr.Type{
+	"tag_id": types.StringType,
+	"label":  types.StringType,
+	"color":  types.StringType,
+}
+
+func tagEnrichedListValue(tags []models.TagEnriched) (types.List, diag.Diagnostics) {
+	var diags diag.Diagnostics
+	objType := types.ObjectType{AttrTypes: tagEnrichedAttrTypes}
+	values := make([]attr.Value, len(tags))
+	for i, t := range tags {
+		obj, d := types.ObjectValue(tagEnrichedAttrTypes, map[string]attr.Value{
+			"tag_id": types.StringValue(string(t.TagID)),
+			"label":  types.StringValue(t.Label),
+			"color":  types.StringValue(string(t.Color)),
+		})
+		diags.Append(d...)
+		if diags.HasError() {
+			return types.ListNull(objType), diags
+		}
+		values[i] = obj
+	}
+	list, d := types.ListValue(objType, values)
+	diags.Append(d...)
+	return list, diags
 }
 
 // formatAPIError returns a multi-line string describing err with as much

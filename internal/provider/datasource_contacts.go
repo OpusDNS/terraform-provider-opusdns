@@ -7,6 +7,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/opusdns/opusdns-go-client/models"
 	"github.com/opusdns/opusdns-go-client/opusdns"
@@ -25,14 +26,18 @@ type ContactsDataSource struct {
 // ContactsDataSourceModel is the top-level data-source state shape, with a
 // few simple filters surfaced as inputs.
 type ContactsDataSourceModel struct {
-	ID        types.String `tfsdk:"id"`
-	Search    types.String `tfsdk:"search"`
-	FirstName types.String `tfsdk:"first_name"`
-	LastName  types.String `tfsdk:"last_name"`
-	Email     types.String `tfsdk:"email"`
-	Country   types.String `tfsdk:"country"`
-	Verified  types.Bool   `tfsdk:"verified"`
-	Contacts  types.List   `tfsdk:"contacts"`
+	ID            types.String `tfsdk:"id"`
+	Search        types.String `tfsdk:"search"`
+	FirstName     types.String `tfsdk:"first_name"`
+	LastName      types.String `tfsdk:"last_name"`
+	Email         types.String `tfsdk:"email"`
+	Country       types.String `tfsdk:"country"`
+	Verified      types.Bool   `tfsdk:"verified"`
+	TagIDs        types.List   `tfsdk:"tag_ids"`
+	TagMode       types.String `tfsdk:"tag_mode"`
+	CreatedAfter  types.String `tfsdk:"created_after"`
+	CreatedBefore types.String `tfsdk:"created_before"`
+	Contacts      types.List   `tfsdk:"contacts"`
 }
 
 var contactItemAttrTypes = map[string]attr.Type{
@@ -78,6 +83,14 @@ func (d *ContactsDataSource) Schema(_ context.Context, _ datasource.SchemaReques
 			"email":      schema.StringAttribute{Optional: true, MarkdownDescription: "Filter by exact email address."},
 			"country":    schema.StringAttribute{Optional: true, MarkdownDescription: "Filter by ISO 3166-1 alpha-2 country code."},
 			"verified":   schema.BoolAttribute{Optional: true, MarkdownDescription: "Filter by verification status."},
+			"tag_ids": schema.ListAttribute{
+				Optional:            true,
+				ElementType:         types.StringType,
+				MarkdownDescription: "Filter by tag IDs. Multiple values are sent as repeated `tag_ids` query parameters.",
+			},
+			"tag_mode":       schema.StringAttribute{Optional: true, MarkdownDescription: "Tag filter mode. Use `match_any` or `match_all` according to the API."},
+			"created_after":  schema.StringAttribute{Optional: true, MarkdownDescription: "Filter contacts created after this RFC3339 timestamp."},
+			"created_before": schema.StringAttribute{Optional: true, MarkdownDescription: "Filter contacts created before this RFC3339 timestamp."},
 
 			"contacts": schema.ListNestedAttribute{
 				Computed:            true,
@@ -142,6 +155,29 @@ func (d *ContactsDataSource) Read(ctx context.Context, req datasource.ReadReques
 	if !data.Verified.IsNull() && !data.Verified.IsUnknown() {
 		v := data.Verified.ValueBool()
 		opts.Verified = &v
+	}
+	if !data.TagIDs.IsNull() && !data.TagIDs.IsUnknown() {
+		raw, diags := stringListValueToStrings(ctx, data.TagIDs)
+		resp.Diagnostics.Append(diags...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
+		opts.TagIDs = make([]models.TagID, 0, len(raw))
+		for _, id := range raw {
+			opts.TagIDs = append(opts.TagIDs, models.TagID(id))
+		}
+	}
+	if !data.TagMode.IsNull() && !data.TagMode.IsUnknown() {
+		opts.TagMode = models.TagFilterMode(data.TagMode.ValueString())
+	}
+	var diags diag.Diagnostics
+	if opts.CreatedAfter, diags = parseOptionalRFC3339(data.CreatedAfter, "created_after"); diags.HasError() {
+		resp.Diagnostics.Append(diags...)
+		return
+	}
+	if opts.CreatedBefore, diags = parseOptionalRFC3339(data.CreatedBefore, "created_before"); diags.HasError() {
+		resp.Diagnostics.Append(diags...)
+		return
 	}
 
 	contacts, err := d.client.Contacts.ListContacts(ctx, opts)

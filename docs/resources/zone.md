@@ -31,7 +31,20 @@ resource "opusdns_zone" "example" {
 
 ### Read-Only
 
+- `created_on` (String) RFC3339 timestamp when the zone was created.
 - `id` (String) The zone name (used as the unique identifier).
+- `tags` (Attributes List) Tags assigned to the zone. The resource always requests `include=tags` during refresh. (see [below for nested schema](#nestedatt--tags))
+- `updated_on` (String) RFC3339 timestamp when the zone was last updated.
+- `zone_id` (String) Server-assigned DNS zone id (`dns_zone_id`).
+
+<a id="nestedatt--tags"></a>
+### Nested Schema for `tags`
+
+Read-Only:
+
+- `color` (String)
+- `label` (String)
+- `tag_id` (String)
 
 ## Import
 

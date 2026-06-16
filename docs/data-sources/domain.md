@@ -34,6 +34,10 @@ output "expires_on" {
 
 - `domain_ref` (String) Domain id (`domain_...`) or fully-qualified name to look up.
 
+### Optional
+
+- `include_tags` (Boolean) When true, request `include=tags` and populate `tags` in state.
+
 ### Read-Only
 
 - `auth_code_expires_on` (String)
@@ -51,6 +55,7 @@ output "expires_on" {
 - `registry_statuses` (List of String)
 - `renewal_mode` (String)
 - `sld` (String)
+- `tags` (Attributes List) Tags assigned to the domain when `include_tags` is true. (see [below for nested schema](#nestedatt--tags))
 - `tld` (String)
 - `transfer_lock` (Boolean)
 - `updated_on` (String)
@@ -62,3 +67,13 @@ Read-Only:
 
 - `hostname` (String)
 - `ip_addresses` (List of String)
+
+
+<a id="nestedatt--tags"></a>
+### Nested Schema for `tags`
+
+Read-Only:
+
+- `color` (String)
+- `label` (String)
+- `tag_id` (String)
