@@ -113,3 +113,45 @@ Resources and data sources are grouped in the Registry sidebar via the `subcateg
 3. Add an example in `examples/resources/<name>/resource.tf` (or `data-sources/<name>/data-source.tf`)
 4. Optionally create a template in `templates/resources/<name>.md.tmpl` with a `subcategory` and import instructions
 5. Run `make generate-docs` — if no template exists, tfplugindocs auto-generates one
+
+## Excluded API surface area
+
+Some OpusDNS API endpoints, SDK methods, and resource concepts are
+**deliberately excluded** from this provider. They will not be implemented
+as resources or data sources, regardless of SDK or API coverage.
+
+The authoritative list lives at `EXCLUDED_API_FEATURES.md` in the repo
+root. Treat it as load-bearing: every API-sync, audit, or feature-add
+session must consult it **before** writing code.
+
+### Required workflow before adding new coverage
+
+1. **Read `EXCLUDED_API_FEATURES.md`** end-to-end. If the endpoint,
+   resource name, or SDK reference appears there, **do not implement it**
+   and cite the exclusion entry in the response to the user.
+2. **Honour the rationale.** Even if the user asks for an excluded
+   surface, surface the exclusion rationale and ask for explicit
+   confirmation before proceeding. The exclusion can only be lifted by
+   removing the entry in the same change that re-introduces the feature.
+3. **Audit agents must respect this list.** When invoking the
+   `opusdns-api-auditor` agent or any equivalent coverage audit, pass the
+   contents (or path) of `EXCLUDED_API_FEATURES.md` as a constraint and
+   verify the report flags excluded items as `excluded` rather than
+   `missing`.
+
+### Adding a new exclusion
+
+Append an entry to `EXCLUDED_API_FEATURES.md` with the structure already
+used (excluded surface area, API endpoints, SDK references, rationale,
+decision date / commits). Keep the rationale concrete enough that a
+future maintainer can decide whether the exclusion still applies.
+
+### Currently excluded
+
+- **Organization IP restrictions** — managed exclusively through the web
+  interface. Covers `/v1/organizations/ip-restrictions[/{id}]` and the
+  matching `Organizations.*IPRestriction*` SDK identifiers and
+  `models.IPRestriction`. Decision history: commits `5caacc7`, `6080ad4`.
+
+When this list grows, mirror the entry both here (short summary) and in
+`EXCLUDED_API_FEATURES.md` (full rationale).
