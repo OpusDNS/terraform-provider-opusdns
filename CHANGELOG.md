@@ -19,8 +19,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Upgraded `opusdns-go-client` `v1.0.10` → `v1.1.1`.** This refreshes the SDK
+  data models against the current OpusDNS API. As a result, several data-source
+  schemas changed to match fields the API no longer returns (see **Removed**),
+  and the `opusdns_domain_suggestions` output was reshaped (see below).
+- **`opusdns_domain_suggestions`** now reflects the current suggest API: each
+  suggestion exposes `available` (bool) and `premium` (bool) instead of `status`
+  and `score`, and pricing is split into `price` and `renewal_price` objects with
+  `amount`/`currency`/`period` fields (replacing the previous
+  `register_price`/`renew_price`/`transfer_price` shape). The request filter
+  `include_unavailable` was replaced by `premium`.
+- **`opusdns_event` / `opusdns_events`** now expose `acknowledged_on` and no
+  longer expose the removed audit fields (see **Removed**).
 - Rewrote `RELEASING.md` to document the HCP Terraform Registry workflow.
 - Corrected the license metadata in `README.md`.
+
+### Removed
+
+- **Fields dropped from data sources because the current API no longer returns
+  them** (SDK `v1.1.1` model refresh). Configurations referencing these
+  attributes must be updated:
+  - `opusdns_contact` / `opusdns_contacts`: `verified`, `verified_on`
+    (the `verified` *filter* on `opusdns_contacts` is retained).
+  - `opusdns_event` / `opusdns_events`: `organization_id`, `user_id`,
+    `ip_address`, `user_agent`, `source`.
+  - `opusdns_events`: the `created_after` / `created_before` request filters.
+
+### Notes
+
+- The `opusdns_tld_portfolio` raw-HTTP workaround for the SDK's
+  `TLDs.GetPortfolio` schema mismatch is retained pending verification that the
+  `v1.1.1` `TLDPortfolio` model matches the bare-array API response.
 
 ## [1.0.1] - 2026-05-21
 

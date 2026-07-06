@@ -50,6 +50,16 @@ func stringPtrToValue(p *string) types.String {
 	return types.StringValue(*p)
 }
 
+// protectedReasonToValue converts a *models.DnsProtectedReason (a
+// string-underlying enum introduced in opusdns-go-client v1.1.x) into a
+// types.String, mapping nil to types.StringNull().
+func protectedReasonToValue(p *models.DnsProtectedReason) types.String {
+	if p == nil {
+		return types.StringNull()
+	}
+	return types.StringValue(string(*p))
+}
+
 // trimTrailingDot removes a single trailing `.` from a hostname. The OpusDNS
 // API returns hostnames in fully-qualified form with a trailing dot (e.g.
 // `example.com.`), but Terraform users supply, and naturally compare, the

@@ -29,12 +29,8 @@ type EventDataSourceModel struct {
 	Subtype        types.String `tfsdk:"subtype"`
 	ObjectType     types.String `tfsdk:"object_type"`
 	ObjectID       types.String `tfsdk:"object_id"`
-	OrganizationID types.String `tfsdk:"organization_id"`
-	UserID         types.String `tfsdk:"user_id"`
-	IPAddress      types.String `tfsdk:"ip_address"`
-	UserAgent      types.String `tfsdk:"user_agent"`
-	Source         types.String `tfsdk:"source"`
 	CreatedOn      types.String `tfsdk:"created_on"`
+	AcknowledgedOn types.String `tfsdk:"acknowledged_on"`
 	EventDataJSON  types.String `tfsdk:"event_data_json"`
 }
 
@@ -116,12 +112,8 @@ func (d *EventDataSource) Read(ctx context.Context, req datasource.ReadRequest, 
 	data.Subtype = attrs["subtype"].(types.String)
 	data.ObjectType = attrs["object_type"].(types.String)
 	data.ObjectID = attrs["object_id"].(types.String)
-	data.OrganizationID = attrs["organization_id"].(types.String)
-	data.UserID = attrs["user_id"].(types.String)
-	data.IPAddress = attrs["ip_address"].(types.String)
-	data.UserAgent = attrs["user_agent"].(types.String)
-	data.Source = attrs["source"].(types.String)
 	data.CreatedOn = attrs["created_on"].(types.String)
+	data.AcknowledgedOn = attrs["acknowledged_on"].(types.String)
 	data.EventDataJSON = attrs["event_data_json"].(types.String)
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)

@@ -327,9 +327,9 @@ func (r *DomainResource) Create(ctx context.Context, req resource.CreateRequest,
 	if data.TransferLock.ValueBool() != hasTransferLock {
 		statusChanges := &models.StatusChanges{}
 		if data.TransferLock.ValueBool() {
-			statusChanges.Add = []string{clientTransferProhibitedStatus}
+			statusChanges.Add = []models.DomainClientStatus{clientTransferProhibitedStatus}
 		} else {
-			statusChanges.Remove = []string{clientTransferProhibitedStatus}
+			statusChanges.Remove = []models.DomainClientStatus{clientTransferProhibitedStatus}
 		}
 		updated, uErr := r.client.Domains.UpdateDomain(ctx, string(domain.DomainID), &models.DomainUpdateRequest{
 			StatusChanges: statusChanges,
@@ -426,9 +426,9 @@ func (r *DomainResource) Update(ctx context.Context, req resource.UpdateRequest,
 	if !plan.TransferLock.Equal(state.TransferLock) {
 		changes := &models.StatusChanges{}
 		if plan.TransferLock.ValueBool() {
-			changes.Add = []string{clientTransferProhibitedStatus}
+			changes.Add = []models.DomainClientStatus{clientTransferProhibitedStatus}
 		} else {
-			changes.Remove = []string{clientTransferProhibitedStatus}
+			changes.Remove = []models.DomainClientStatus{clientTransferProhibitedStatus}
 		}
 		updateReq.StatusChanges = changes
 		hasChange = true

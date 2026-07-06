@@ -56,8 +56,6 @@ var contactItemAttrTypes = map[string]attr.Type{
 	"postal_code":     types.StringType,
 	"country":         types.StringType,
 	"disclose":        types.BoolType,
-	"verified":        types.BoolType,
-	"verified_on":     types.StringType,
 	"created_on":      types.StringType,
 	"updated_on":      types.StringType,
 }
@@ -112,8 +110,6 @@ func (d *ContactsDataSource) Schema(_ context.Context, _ datasource.SchemaReques
 						"postal_code":     schema.StringAttribute{Computed: true},
 						"country":         schema.StringAttribute{Computed: true},
 						"disclose":        schema.BoolAttribute{Computed: true},
-						"verified":        schema.BoolAttribute{Computed: true},
-						"verified_on":     schema.StringAttribute{Computed: true},
 						"created_on":      schema.StringAttribute{Computed: true},
 						"updated_on":      schema.StringAttribute{Computed: true},
 					},
@@ -206,8 +202,6 @@ func (d *ContactsDataSource) Read(ctx context.Context, req datasource.ReadReques
 			"postal_code":     types.StringValue(c.PostalCode),
 			"country":         types.StringValue(c.Country),
 			"disclose":        types.BoolValue(c.Disclose),
-			"verified":        types.BoolValue(c.Verified),
-			"verified_on":     timePtrToValue(c.VerifiedOn),
 			"created_on":      timePtrToValue(c.CreatedOn),
 			"updated_on":      timePtrToValue(c.UpdatedOn),
 		})

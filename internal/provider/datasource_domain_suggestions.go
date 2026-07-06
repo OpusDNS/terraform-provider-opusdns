@@ -24,32 +24,32 @@ type DomainSuggestionsDataSource struct {
 }
 
 type DomainSuggestionsDataSourceModel struct {
-	ID                 types.String `tfsdk:"id"`
-	Query              types.String `tfsdk:"query"`
-	TLDs               types.List   `tfsdk:"tlds"`
-	Limit              types.Int64  `tfsdk:"limit"`
-	IncludeUnavailable types.Bool   `tfsdk:"include_unavailable"`
-	Suggestions        types.List   `tfsdk:"suggestions"`
-	Total              types.Int64  `tfsdk:"total"`
-	ProcessingTimeMs   types.Int64  `tfsdk:"processing_time_ms"`
+	ID               types.String `tfsdk:"id"`
+	Query            types.String `tfsdk:"query"`
+	TLDs             types.List   `tfsdk:"tlds"`
+	Limit            types.Int64  `tfsdk:"limit"`
+	Premium          types.Bool   `tfsdk:"premium"`
+	Suggestions      types.List   `tfsdk:"suggestions"`
+	Total            types.Int64  `tfsdk:"total"`
+	ProcessingTimeMs types.Int64  `tfsdk:"processing_time_ms"`
 }
 
 // domainSuggestionPriceAttrTypes is the nested object shape for the
-// optional `price` field on each suggestion. Pricing pointers in the SDK
-// are nullable; we surface them as empty strings here for simplicity.
+// `price` / `renewal_price` fields on each suggestion. The SDK's
+// DomainSearchSuggestionPriceData carries a nullable amount, a currency,
+// and a period; we surface amount as an empty string when the API omits it.
 var domainSuggestionPriceAttrTypes = map[string]attr.Type{
-	"register_price": types.StringType,
-	"renew_price":    types.StringType,
-	"transfer_price": types.StringType,
-	"currency":       types.StringType,
-	"period":         types.Int64Type,
+	"amount":   types.StringType,
+	"currency": types.StringType,
+	"period":   types.StringType,
 }
 
 var domainSuggestionAttrTypes = map[string]attr.Type{
-	"domain": types.StringType,
-	"status": types.StringType,
-	"score":  types.Float64Type,
-	"price":  types.ObjectType{AttrTypes: domainSuggestionPriceAttrTypes},
+	"domain":        types.StringType,
+	"available":     types.BoolType,
+	"premium":       types.BoolType,
+	"price":         types.ObjectType{AttrTypes: domainSuggestionPriceAttrTypes},
+	"renewal_price": types.ObjectType{AttrTypes: domainSuggestionPriceAttrTypes},
 }
 
 func NewDomainSuggestionsDataSource() datasource.DataSource {
@@ -64,7 +64,7 @@ func (d *DomainSuggestionsDataSource) Schema(_ context.Context, _ datasource.Sch
 	resp.Schema = schema.Schema{
 		MarkdownDescription: "Returns ranked domain-name suggestions for a query string " +
 			"(`GET /v1/domain-search/suggest`). Each suggestion includes the candidate domain, " +
-			"its current availability status, a relevance score, and optional pricing.",
+			"whether it is available, whether it is premium, and optional registration/renewal pricing.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Computed:            true,
@@ -83,9 +83,9 @@ func (d *DomainSuggestionsDataSource) Schema(_ context.Context, _ datasource.Sch
 				Optional:            true,
 				MarkdownDescription: "Maximum number of suggestions to return. Server default applies when omitted.",
 			},
-			"include_unavailable": schema.BoolAttribute{
+			"premium": schema.BoolAttribute{
 				Optional:            true,
-				MarkdownDescription: "Whether to include unavailable suggestions in the response.",
+				MarkdownDescription: "Whether to include premium domains in the suggestions. Server default applies when omitted.",
 			},
 			"total": schema.Int64Attribute{
 				Computed:            true,
@@ -100,18 +100,25 @@ func (d *DomainSuggestionsDataSource) Schema(_ context.Context, _ datasource.Sch
 				MarkdownDescription: "Ranked list of suggested domains.",
 				NestedObject: schema.NestedAttributeObject{
 					Attributes: map[string]schema.Attribute{
-						"domain": schema.StringAttribute{Computed: true, MarkdownDescription: "Suggested domain name."},
-						"status": schema.StringAttribute{Computed: true, MarkdownDescription: "Availability status (e.g. `available`, `unavailable`, `premium`)."},
-						"score":  schema.Float64Attribute{Computed: true, MarkdownDescription: "Relevance score (higher is more relevant)."},
+						"domain":    schema.StringAttribute{Computed: true, MarkdownDescription: "Suggested domain name."},
+						"available": schema.BoolAttribute{Computed: true, MarkdownDescription: "Whether the suggested domain is available for registration."},
+						"premium":   schema.BoolAttribute{Computed: true, MarkdownDescription: "Whether the suggested domain is a premium domain."},
 						"price": schema.SingleNestedAttribute{
 							Computed:            true,
-							MarkdownDescription: "Optional pricing for the suggested domain. All string fields default to empty when the API omits them.",
+							MarkdownDescription: "Registration pricing for the suggested domain. `amount` defaults to empty when the API omits it.",
 							Attributes: map[string]schema.Attribute{
-								"register_price": schema.StringAttribute{Computed: true},
-								"renew_price":    schema.StringAttribute{Computed: true},
-								"transfer_price": schema.StringAttribute{Computed: true},
-								"currency":       schema.StringAttribute{Computed: true},
-								"period":         schema.Int64Attribute{Computed: true},
+								"amount":   schema.StringAttribute{Computed: true},
+								"currency": schema.StringAttribute{Computed: true},
+								"period":   schema.StringAttribute{Computed: true},
+							},
+						},
+						"renewal_price": schema.SingleNestedAttribute{
+							Computed:            true,
+							MarkdownDescription: "Renewal pricing for the suggested domain, if provided. `amount` defaults to empty when the API omits it.",
+							Attributes: map[string]schema.Attribute{
+								"amount":   schema.StringAttribute{Computed: true},
+								"currency": schema.StringAttribute{Computed: true},
+								"period":   schema.StringAttribute{Computed: true},
 							},
 						},
 					},
@@ -165,8 +172,9 @@ func (d *DomainSuggestionsDataSource) Read(ctx context.Context, req datasource.R
 	if !data.Limit.IsNull() && !data.Limit.IsUnknown() {
 		opts.Limit = int(data.Limit.ValueInt64())
 	}
-	if !data.IncludeUnavailable.IsNull() && !data.IncludeUnavailable.IsUnknown() {
-		opts.IncludeUnavailable = data.IncludeUnavailable.ValueBool()
+	if !data.Premium.IsNull() && !data.Premium.IsUnknown() {
+		premium := data.Premium.ValueBool()
+		opts.Premium = &premium
 	}
 
 	suggestResp, err := d.client.Availability.GetSuggestions(ctx, query, opts)
@@ -185,12 +193,12 @@ func (d *DomainSuggestionsDataSource) Read(ctx context.Context, req datasource.R
 	objType := types.ObjectType{AttrTypes: domainSuggestionAttrTypes}
 	values := make([]attr.Value, len(suggestResp.Suggestions))
 	for i, s := range suggestResp.Suggestions {
-		priceObj := buildSuggestionPriceObject(s.Price)
 		obj, diags := types.ObjectValue(domainSuggestionAttrTypes, map[string]attr.Value{
-			"domain": types.StringValue(s.Domain),
-			"status": types.StringValue(string(s.Status)),
-			"score":  types.Float64Value(s.Score),
-			"price":  priceObj,
+			"domain":        types.StringValue(s.Domain),
+			"available":     types.BoolValue(s.Available),
+			"premium":       types.BoolValue(s.Premium),
+			"price":         buildSuggestionPriceObject(&s.Price),
+			"renewal_price": buildSuggestionPriceObject(s.RenewalPrice),
 		})
 		resp.Diagnostics.Append(diags...)
 		if resp.Diagnostics.HasError() {
@@ -212,36 +220,22 @@ func (d *DomainSuggestionsDataSource) Read(ctx context.Context, req datasource.R
 }
 
 // buildSuggestionPriceObject returns a fully-populated object for the
-// nested `price` attribute. A nil pointer yields an object with all
-// fields set to zero values (rather than a null object) so the schema's
-// static type is satisfied unconditionally.
-func buildSuggestionPriceObject(p *models.DomainPrice) types.Object {
-	if p == nil {
-		obj, _ := types.ObjectValue(domainSuggestionPriceAttrTypes, map[string]attr.Value{
-			"register_price": types.StringValue(""),
-			"renew_price":    types.StringValue(""),
-			"transfer_price": types.StringValue(""),
-			"currency":       types.StringValue(""),
-			"period":         types.Int64Value(0),
-		})
-		return obj
-	}
-	reg, ren, tx := "", "", ""
-	if p.RegisterPrice != nil {
-		reg = *p.RegisterPrice
-	}
-	if p.RenewPrice != nil {
-		ren = *p.RenewPrice
-	}
-	if p.TransferPrice != nil {
-		tx = *p.TransferPrice
+// nested `price` / `renewal_price` attributes. A nil pointer yields an
+// object with all fields set to zero values (rather than a null object) so
+// the schema's static type is satisfied unconditionally.
+func buildSuggestionPriceObject(p *models.DomainSearchSuggestionPriceData) types.Object {
+	amount, currency, period := "", "", ""
+	if p != nil {
+		if p.Amount != nil {
+			amount = *p.Amount
+		}
+		currency = p.Currency
+		period = fmt.Sprintf("%d%s", p.Period.Value, string(p.Period.Unit))
 	}
 	obj, _ := types.ObjectValue(domainSuggestionPriceAttrTypes, map[string]attr.Value{
-		"register_price": types.StringValue(reg),
-		"renew_price":    types.StringValue(ren),
-		"transfer_price": types.StringValue(tx),
-		"currency":       types.StringValue(string(p.Currency)),
-		"period":         types.Int64Value(int64(p.Period)),
+		"amount":   types.StringValue(amount),
+		"currency": types.StringValue(currency),
+		"period":   types.StringValue(period),
 	})
 	return obj
 }
