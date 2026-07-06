@@ -50,13 +50,12 @@ func eventAttributeSchema(computed bool) map[string]schema.Attribute {
 // rather than a panic.
 func eventToObject(e models.Event) (types.Object, diag.Diagnostics) {
 	var diags diag.Diagnostics
-	dataJSON := "{}"
 	b, err := json.Marshal(e.EventData)
 	if err != nil {
 		diags.AddError("Error marshalling event_data", err.Error())
 		return types.ObjectNull(eventAttrTypes), diags
 	}
-	dataJSON = string(b)
+	dataJSON := string(b)
 
 	eventType := ""
 	if e.Type != nil {
