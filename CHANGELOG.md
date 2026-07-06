@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`opusdns_domain` transfer-in support** — set `transfer = true` with an
+  `auth_code` to transfer an existing domain in from another registrar
+  (`POST /v1/domains/transfer`) instead of registering a new one. `create_zone`
+  is not supported for transfers, and `period_unit` must be `y` (the transfer
+  API accepts a year count only). The transferred domain is then managed
+  identically to a registered one. Backwards compatible: `transfer` defaults to
+  `false`, so existing configurations are unaffected.
+
 ### Changed
 
 - Rewrote `RELEASING.md` to document the HCP Terraform Registry workflow.
