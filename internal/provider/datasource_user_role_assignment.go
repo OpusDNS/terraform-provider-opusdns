@@ -7,17 +7,17 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/opusdns/opusdns-go-client/models"
 	"github.com/opusdns/opusdns-go-client/opusdns"
 )
 
 // Ensure UserRoleAssignmentDataSource satisfies the datasource.DataSource interface.
 var _ datasource.DataSource = &UserRoleAssignmentDataSource{}
 
-// UserRoleAssignmentDataSource reads the set of roles assigned to a single
-// user via `GET /v1/users/{user_id}/roles`. Mirrors the read side of
-// UserRoleAssignmentResource, including the validRoles filter so that the
-// `roles` attribute here is directly comparable to
-// `opusdns_user_role_assignment.<name>.roles`.
+// UserRoleAssignmentDataSource reads the single role assigned to a user via
+// `GET /v1/users/{user_id}/role` (SDK: Users.GetUserRole). Mirrors the read
+// side of UserRoleAssignmentResource so the `role` attribute here is directly
+// comparable to `opusdns_user_role_assignment.<name>.role`.
 type UserRoleAssignmentDataSource struct {
 	client *opusdns.Client
 }
@@ -26,7 +26,7 @@ type UserRoleAssignmentDataSource struct {
 type UserRoleAssignmentDataSourceModel struct {
 	ID     types.String `tfsdk:"id"`
 	UserID types.String `tfsdk:"user_id"`
-	Roles  types.Set    `tfsdk:"roles"`
+	Role   types.String `tfsdk:"role"`
 }
 
 // NewUserRoleAssignmentDataSource returns a new UserRoleAssignmentDataSource.
@@ -40,11 +40,9 @@ func (d *UserRoleAssignmentDataSource) Metadata(_ context.Context, req datasourc
 
 func (d *UserRoleAssignmentDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		MarkdownDescription: "Fetches the set of roles (SpiceDB relations) currently assigned to a user via " +
-			"`GET /v1/users/{user_id}/roles`. The returned `roles` set is filtered to the provider-managed " +
-			"subset (see the `opusdns_user_role_assignment` resource for the allow-list); roles managed " +
-			"implicitly by the API (e.g. `accepted_tos`, `owner`, `self`) are omitted so the value lines up " +
-			"with what the matching resource would store in state.",
+		MarkdownDescription: "Fetches the single role currently assigned to a user via " +
+			"`GET /v1/users/{user_id}/role`. The `role` is a built-in role name or the `label` of a custom " +
+			"role, or empty when the user has no role assigned.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Computed:            true,
@@ -52,12 +50,11 @@ func (d *UserRoleAssignmentDataSource) Schema(_ context.Context, _ datasource.Sc
 			},
 			"user_id": schema.StringAttribute{
 				Required:            true,
-				MarkdownDescription: "ID of the user whose roles to fetch (e.g. `user_...`).",
+				MarkdownDescription: "ID of the user whose role to fetch (e.g. `user_...`).",
 			},
-			"roles": schema.SetAttribute{
+			"role": schema.StringAttribute{
 				Computed:            true,
-				ElementType:         types.StringType,
-				MarkdownDescription: "Roles assigned to the user, filtered to the provider-managed subset.",
+				MarkdownDescription: "The role assigned to the user, or empty when no role is assigned.",
 			},
 		},
 	}
@@ -94,15 +91,13 @@ func (d *UserRoleAssignmentDataSource) Read(ctx context.Context, req datasource.
 		return
 	}
 
-	// fetchUserRoles already filters through validRoles; see
-	// resource_user_role_assignment.go.
-	roles, err := fetchUserRoles(ctx, d.client, userID)
+	assignment, err := d.client.Users.GetUserRole(ctx, models.UserID(userID))
 	if err != nil {
-		resp.Diagnostics.AddError("Error reading user roles", formatAPIError(err))
+		resp.Diagnostics.AddError("Error reading user role", formatAPIError(err))
 		return
 	}
 
 	data.ID = types.StringValue(userID)
-	data.Roles = stringSliceToSet(roles)
+	data.Role = roleAssignmentToValue(assignment)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }

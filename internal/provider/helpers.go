@@ -222,3 +222,36 @@ func formatAPIError(err error) string {
 	}
 	return b.String()
 }
+
+// setToStringSlice extracts the element strings from a Terraform Set value.
+// A null or unknown set yields a nil slice with no diagnostics.
+func setToStringSlice(ctx context.Context, s types.Set) ([]string, diag.Diagnostics) {
+	if s.IsNull() || s.IsUnknown() {
+		return nil, nil
+	}
+	var out []string
+	diags := s.ElementsAs(ctx, &out, false)
+	return out, diags
+}
+
+// extractFromSlice best-effort pulls string values out of an arbitrarily-shaped
+// JSON array. It handles bare strings and objects, reading the first present of
+// a small set of common name-like keys from each object element. Used by data
+// sources that decode untyped API responses (e.g. user permissions).
+func extractFromSlice(items []interface{}) []string {
+	out := make([]string, 0, len(items))
+	for _, it := range items {
+		switch v := it.(type) {
+		case string:
+			out = append(out, v)
+		case map[string]interface{}:
+			for _, key := range []string{"name", "role", "id", "value", "role_name"} {
+				if s, ok := v[key].(string); ok {
+					out = append(out, s)
+					break
+				}
+			}
+		}
+	}
+	return out
+}
