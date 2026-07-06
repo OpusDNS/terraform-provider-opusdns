@@ -44,6 +44,7 @@ type DomainResourceModel struct {
 	PeriodValue       types.Int64  `tfsdk:"period_value"`
 	PeriodUnit        types.String `tfsdk:"period_unit"`
 	CreateZone        types.Bool   `tfsdk:"create_zone"`
+	Transfer          types.Bool   `tfsdk:"transfer"`
 	AuthCode          types.String `tfsdk:"auth_code"`
 	RenewalMode       types.String `tfsdk:"renewal_mode"`
 	TransferLock      types.Bool   `tfsdk:"transfer_lock"`
@@ -87,9 +88,10 @@ func (r *DomainResource) Schema(_ context.Context, _ resource.SchemaRequest, res
 	requiresReplaceString := []planmodifier.String{stringplanmodifier.RequiresReplace()}
 	resp.Schema = schema.Schema{
 		MarkdownDescription: "Registers and manages a domain in OpusDNS via `POST /v1/domains` and `PATCH /v1/domains/{ref}`. " +
+			"Set `transfer = true` (with `auth_code`) to transfer an existing domain in from another registrar via `POST /v1/domains/transfer` instead of registering a new one. " +
 			"Updatable in place: `contacts`, `nameservers`, `renewal_mode`, `transfer_lock`. " +
-			"Other inputs (`name`, `period_*`, `create_zone`, `auth_code`) require replacement. " +
-			"Premium pricing confirmation, TMCH claims acceptance, transfer-in, restore, and DNSSEC are not modeled here; use the dedicated APIs / a future `opusdns_domain_dnssec` resource for those.",
+			"Other inputs (`name`, `period_*`, `create_zone`, `transfer`, `auth_code`) require replacement. " +
+			"Premium pricing confirmation, TMCH claims acceptance, restore, and DNSSEC are not modeled here; use the dedicated APIs / a future `opusdns_domain_dnssec` resource for those.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Computed:            true,
@@ -150,7 +152,20 @@ func (r *DomainResource) Schema(_ context.Context, _ resource.SchemaRequest, res
 				Optional:            true,
 				Computed:            true,
 				Default:             booldefault.StaticBool(false),
-				MarkdownDescription: "When `true`, also creates a DNS zone for the domain on OpusDNS nameserver infrastructure. On destroy, the provider also attempts to delete that side-effect zone. Defaults to `false`. Forces replacement.",
+				MarkdownDescription: "When `true`, also creates a DNS zone for the domain on OpusDNS nameserver infrastructure. On destroy, the provider also attempts to delete that side-effect zone. Defaults to `false`. Forces replacement. Not supported when `transfer = true`.",
+				PlanModifiers: []planmodifier.Bool{
+					boolplanmodifier.RequiresReplace(),
+					boolplanmodifier.UseStateForUnknown(),
+				},
+			},
+			"transfer": schema.BoolAttribute{
+				Optional: true,
+				Computed: true,
+				Default:  booldefault.StaticBool(false),
+				MarkdownDescription: "When `true`, the domain is transferred in from another registrar via " +
+					"`POST /v1/domains/transfer` instead of being registered. Requires `auth_code`. " +
+					"`create_zone` is not supported for transfers, and `period_unit` must be `y` " +
+					"(the transfer API accepts a year count only). Defaults to `false`. Forces replacement.",
 				PlanModifiers: []planmodifier.Bool{
 					boolplanmodifier.RequiresReplace(),
 					boolplanmodifier.UseStateForUnknown(),
@@ -160,7 +175,7 @@ func (r *DomainResource) Schema(_ context.Context, _ resource.SchemaRequest, res
 				Optional:            true,
 				Computed:            true,
 				Sensitive:           true,
-				MarkdownDescription: "Optional auth code (EPP authInfo) to set on the domain at registration. Forces replacement.",
+				MarkdownDescription: "Auth code (EPP authInfo). Optional at registration; required when `transfer = true`. Forces replacement.",
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
 					stringplanmodifier.UseStateForUnknown(),
@@ -258,6 +273,11 @@ func (r *DomainResource) Create(ctx context.Context, req resource.CreateRequest,
 		return
 	}
 
+	resp.Diagnostics.Append(validateDomainConfig(data)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
 	contacts, diags := contactsMapToAPI(ctx, data.Contacts)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
@@ -270,34 +290,46 @@ func (r *DomainResource) Create(ctx context.Context, req resource.CreateRequest,
 		return
 	}
 
-	createReq := &models.DomainCreateRequest{
-		Name:        data.Name.ValueString(),
-		Contacts:    contacts,
-		RenewalMode: models.RenewalMode(data.RenewalMode.ValueString()),
-		Period: models.DomainPeriod{
-			Value: int(data.PeriodValue.ValueInt64()),
-			Unit:  models.PeriodUnit(data.PeriodUnit.ValueString()),
-		},
-		Nameservers: nameservers,
-		AuthCode:    optionalStringPtr(data.AuthCode),
-		CreateZone:  data.CreateZone.ValueBool(),
+	var domain *models.Domain
+	if data.Transfer.ValueBool() {
+		transferReq := buildDomainTransferRequest(data, contacts, nameservers)
+		transferred, err := r.client.Domains.TransferDomain(ctx, transferReq)
+		if err != nil {
+			resp.Diagnostics.AddError("Error transferring domain", formatAPIError(err))
+			return
+		}
+		domain = transferred
+	} else {
+		createReq := &models.DomainCreateRequest{
+			Name:        data.Name.ValueString(),
+			Contacts:    contacts,
+			RenewalMode: models.RenewalMode(data.RenewalMode.ValueString()),
+			Period: models.DomainPeriod{
+				Value: int(data.PeriodValue.ValueInt64()),
+				Unit:  models.PeriodUnit(data.PeriodUnit.ValueString()),
+			},
+			Nameservers: nameservers,
+			AuthCode:    optionalStringPtr(data.AuthCode),
+			CreateZone:  data.CreateZone.ValueBool(),
+		}
+
+		created, err := r.client.Domains.CreateDomain(ctx, createReq)
+		if err != nil {
+			resp.Diagnostics.AddError("Error creating domain", formatAPIError(err))
+			return
+		}
+		domain = created
 	}
 
-	domain, err := r.client.Domains.CreateDomain(ctx, createReq)
-	if err != nil {
-		resp.Diagnostics.AddError("Error creating domain", formatAPIError(err))
-		return
-	}
-
-	// The API doesn't accept transfer_lock at create time, so reconcile the
-	// freshly-created domain to the desired lock state afterwards.
+	// The API doesn't accept transfer_lock at create/transfer time, so reconcile
+	// the freshly-created domain to the desired lock state afterwards.
 	hasTransferLock := domainHasClientTransferProhibited(domain)
 	if data.TransferLock.ValueBool() != hasTransferLock {
 		statusChanges := &models.StatusChanges{}
 		if data.TransferLock.ValueBool() {
-			statusChanges.Add = []string{clientTransferProhibitedStatus}
+			statusChanges.Add = []models.DomainClientStatus{clientTransferProhibitedStatus}
 		} else {
-			statusChanges.Remove = []string{clientTransferProhibitedStatus}
+			statusChanges.Remove = []models.DomainClientStatus{clientTransferProhibitedStatus}
 		}
 		updated, uErr := r.client.Domains.UpdateDomain(ctx, string(domain.DomainID), &models.DomainUpdateRequest{
 			StatusChanges: statusChanges,
@@ -394,9 +426,9 @@ func (r *DomainResource) Update(ctx context.Context, req resource.UpdateRequest,
 	if !plan.TransferLock.Equal(state.TransferLock) {
 		changes := &models.StatusChanges{}
 		if plan.TransferLock.ValueBool() {
-			changes.Add = []string{clientTransferProhibitedStatus}
+			changes.Add = []models.DomainClientStatus{clientTransferProhibitedStatus}
 		} else {
-			changes.Remove = []string{clientTransferProhibitedStatus}
+			changes.Remove = []models.DomainClientStatus{clientTransferProhibitedStatus}
 		}
 		updateReq.StatusChanges = changes
 		hasChange = true
@@ -478,10 +510,67 @@ func (r *DomainResource) ImportState(ctx context.Context, req resource.ImportSta
 	data.PeriodValue = types.Int64Value(1)
 	data.PeriodUnit = types.StringValue(string(models.PeriodUnitYear))
 	data.CreateZone = types.BoolValue(false)
+	data.Transfer = types.BoolValue(false)
 	data.AuthCode = types.StringNull()
 
 	resp.Diagnostics.Append(populateDomainResourceModel(ctx, &data, domain)...)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
+}
+
+// validateDomainConfig enforces the cross-attribute rules that the framework
+// schema cannot express directly. The transfer create path (POST
+// /v1/domains/transfer) requires an auth code, has no create_zone field, and
+// accepts a bare year count (so period_unit must be "y"). Returns diagnostics
+// rather than mutating state, which keeps it a pure function and trivially
+// unit-testable.
+func validateDomainConfig(data DomainResourceModel) diag.Diagnostics {
+	var diags diag.Diagnostics
+	if !data.Transfer.ValueBool() {
+		return diags
+	}
+
+	if optionalStringPtr(data.AuthCode) == nil || data.AuthCode.ValueString() == "" {
+		diags.AddError(
+			"Missing auth_code for domain transfer",
+			"`auth_code` is required when `transfer = true`. Supply the EPP authInfo code from the losing registrar.",
+		)
+	}
+
+	if data.CreateZone.ValueBool() {
+		diags.AddError(
+			"create_zone not supported for domain transfer",
+			"`create_zone` cannot be set when `transfer = true`; the transfer API does not create a side-effect DNS zone. Remove `create_zone` (or set it to `false`) for transfers.",
+		)
+	}
+
+	if !data.PeriodUnit.IsNull() && !data.PeriodUnit.IsUnknown() &&
+		data.PeriodUnit.ValueString() != string(models.PeriodUnitYear) {
+		diags.AddError(
+			"period_unit must be \"y\" for domain transfer",
+			fmt.Sprintf("`transfer = true` accepts a year count only, but `period_unit` is %q. Set `period_unit = \"y\"` for transfers.", data.PeriodUnit.ValueString()),
+		)
+	}
+
+	return diags
+}
+
+// buildDomainTransferRequest assembles a DomainTransferRequest from the resource
+// model and the already-converted contacts/nameservers. Period is sent as a bare
+// year count (the transfer API has no period unit). Callers must validate the
+// model with validateDomainConfig first.
+func buildDomainTransferRequest(
+	data DomainResourceModel,
+	contacts map[models.DomainContactType][]models.ContactHandle,
+	nameservers []models.Nameserver,
+) *models.DomainTransferRequest {
+	return &models.DomainTransferRequest{
+		Name:        data.Name.ValueString(),
+		AuthCode:    data.AuthCode.ValueString(),
+		Contacts:    contacts,
+		RenewalMode: models.RenewalMode(data.RenewalMode.ValueString()),
+		Nameservers: nameservers,
+		Period:      int(data.PeriodValue.ValueInt64()),
+	}
 }
 
 // populateDomainResourceModel sets the model fields from an API domain response.

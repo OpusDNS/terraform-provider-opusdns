@@ -2,7 +2,6 @@ package provider
 
 import (
 	"context"
-	"time"
 
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
@@ -32,8 +31,6 @@ type EventsDataSourceModel struct {
 	ObjectType    types.String `tfsdk:"object_type"`
 	ObjectID      types.String `tfsdk:"object_id"`
 	Acknowledged  types.Bool   `tfsdk:"acknowledged"`
-	CreatedAfter  types.String `tfsdk:"created_after"`
-	CreatedBefore types.String `tfsdk:"created_before"`
 	Events        types.List   `tfsdk:"events"`
 	TotalReturned types.Int64  `tfsdk:"total_returned"`
 }
@@ -85,14 +82,6 @@ func (d *EventsDataSource) Schema(_ context.Context, _ datasource.SchemaRequest,
 				Optional:            true,
 				MarkdownDescription: "Filter by acknowledgement status.",
 			},
-			"created_after": schema.StringAttribute{
-				Optional:            true,
-				MarkdownDescription: "RFC3339 timestamp; only events created strictly after this are returned.",
-			},
-			"created_before": schema.StringAttribute{
-				Optional:            true,
-				MarkdownDescription: "RFC3339 timestamp; only events created strictly before this are returned.",
-			},
 			"total_returned": schema.Int64Attribute{
 				Computed:            true,
 				MarkdownDescription: "Number of events returned on this page (length of `events`).",
@@ -143,22 +132,6 @@ func (d *EventsDataSource) Read(ctx context.Context, req datasource.ReadRequest,
 	if !data.Acknowledged.IsNull() && !data.Acknowledged.IsUnknown() {
 		b := data.Acknowledged.ValueBool()
 		opts.Acknowledged = &b
-	}
-	if v := data.CreatedAfter.ValueString(); v != "" {
-		t, err := time.Parse(time.RFC3339, v)
-		if err != nil {
-			resp.Diagnostics.AddError("Invalid created_after timestamp", err.Error())
-			return
-		}
-		opts.CreatedAfter = &t
-	}
-	if v := data.CreatedBefore.ValueString(); v != "" {
-		t, err := time.Parse(time.RFC3339, v)
-		if err != nil {
-			resp.Diagnostics.AddError("Invalid created_before timestamp", err.Error())
-			return
-		}
-		opts.CreatedBefore = &t
 	}
 
 	events, err := d.client.Events.ListEvents(ctx, opts)

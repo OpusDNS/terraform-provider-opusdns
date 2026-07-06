@@ -143,7 +143,7 @@ func (d *DNSRecordDataSource) Read(ctx context.Context, req datasource.ReadReque
 	data.TTL = types.Int64Value(int64(rrset.TTL))
 	data.Records = recordList
 	data.Protected = types.BoolValue(rrset.Protected)
-	data.ProtectedReason = stringPtrToValue(rrset.ProtectedReason)
+	data.ProtectedReason = protectedReasonToValue(rrset.ProtectedReason)
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }

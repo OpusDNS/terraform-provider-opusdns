@@ -30,3 +30,22 @@ resource "opusdns_domain" "example" {
     { hostname = "ns2.opusdns.com" },
   ]
 }
+
+# Transfer an existing domain in from another registrar. Set `transfer = true`
+# and supply the EPP auth code from the losing registrar. `create_zone` is not
+# supported for transfers, and `period_unit` must be "y" (a year count).
+resource "opusdns_domain" "transferred" {
+  name      = "transfer-me.com"
+  transfer  = true
+  auth_code = var.transfer_auth_code
+
+  period_value = 1
+  period_unit  = "y"
+
+  contacts = {
+    registrant = [opusdns_contact.registrant.contact_id]
+    admin      = [opusdns_contact.registrant.contact_id]
+    tech       = [opusdns_contact.registrant.contact_id]
+    billing    = [opusdns_contact.registrant.contact_id]
+  }
+}

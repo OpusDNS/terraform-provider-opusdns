@@ -41,8 +41,6 @@ type ContactDataSourceModel struct {
 	PostalCode     types.String `tfsdk:"postal_code"`
 	Country        types.String `tfsdk:"country"`
 	Disclose       types.Bool   `tfsdk:"disclose"`
-	Verified       types.Bool   `tfsdk:"verified"`
-	VerifiedOn     types.String `tfsdk:"verified_on"`
 	CreatedOn      types.String `tfsdk:"created_on"`
 	UpdatedOn      types.String `tfsdk:"updated_on"`
 }
@@ -76,8 +74,6 @@ func (d *ContactDataSource) Schema(_ context.Context, _ datasource.SchemaRequest
 			"postal_code":     schema.StringAttribute{Computed: true},
 			"country":         schema.StringAttribute{Computed: true, MarkdownDescription: "ISO 3166-1 alpha-2 country code."},
 			"disclose":        schema.BoolAttribute{Computed: true, MarkdownDescription: "Whether the contact is publicly disclosed (WHOIS)."},
-			"verified":        schema.BoolAttribute{Computed: true},
-			"verified_on":     schema.StringAttribute{Computed: true, MarkdownDescription: "RFC3339 timestamp when the contact was verified, if any."},
 			"created_on":      schema.StringAttribute{Computed: true, MarkdownDescription: "RFC3339 timestamp when the contact was created."},
 			"updated_on":      schema.StringAttribute{Computed: true, MarkdownDescription: "RFC3339 timestamp when the contact was last updated."},
 		},
@@ -135,9 +131,7 @@ func populateContactDataSourceModel(data *ContactDataSourceModel, c *models.Cont
 	data.PostalCode = types.StringValue(c.PostalCode)
 	data.Country = types.StringValue(c.Country)
 	data.Disclose = types.BoolValue(c.Disclose)
-	data.Verified = types.BoolValue(c.Verified)
 
-	data.VerifiedOn = timePtrToValue(c.VerifiedOn)
 	data.CreatedOn = timePtrToValue(c.CreatedOn)
 	data.UpdatedOn = timePtrToValue(c.UpdatedOn)
 }

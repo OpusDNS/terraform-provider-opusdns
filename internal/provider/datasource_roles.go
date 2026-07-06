@@ -2,34 +2,39 @@ package provider
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 
+	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/opusdns/opusdns-go-client/models"
 	"github.com/opusdns/opusdns-go-client/opusdns"
 )
 
 var _ datasource.DataSource = &RolesDataSource{}
 
-// RolesDataSource lists all roles available in the organization
-// (`GET /v1/organizations/roles`).
-//
-// The OpenAPI spec declares no typed response schema for this endpoint, so
-// the data source exposes both:
-//   - `role_names`: best-effort list of string role names extracted from the
-//     response (works whether the API returns `[{"name": "..."}]`,
-//     `[{"role": "..."}]`, or bare `["..."]`)
-//   - `roles_json`: the raw JSON body for callers that need richer metadata
+// RolesDataSource lists all roles available in the caller's organization
+// (`GET /v1/organizations/roles`, SDK: Organizations.ListRoles). Both built-in
+// and custom roles are returned, each with its label, display name, whether it
+// is built-in, and the `resource:scope` permission strings it grants.
 type RolesDataSource struct {
 	client *opusdns.Client
 }
 
 type RolesDataSourceModel struct {
-	ID        types.String `tfsdk:"id"`
-	RoleNames types.List   `tfsdk:"role_names"`
-	RolesJSON types.String `tfsdk:"roles_json"`
+	ID    types.String `tfsdk:"id"`
+	Roles types.List   `tfsdk:"roles"`
+}
+
+// roleAttrTypes is the object shape for each element of the `roles` list.
+var roleAttrTypes = map[string]attr.Type{
+	"label":       types.StringType,
+	"name":        types.StringType,
+	"description": types.StringType,
+	"built_in":    types.BoolType,
+	"permissions": types.ListType{ElemType: types.StringType},
 }
 
 func NewRolesDataSource() datasource.DataSource {
@@ -43,20 +48,28 @@ func (d *RolesDataSource) Metadata(_ context.Context, req datasource.MetadataReq
 func (d *RolesDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		MarkdownDescription: "Lists all roles available in the authenticated caller's organization " +
-			"(`GET /v1/organizations/roles`). The API's response is untyped in the OpenAPI spec, so " +
-			"this data source surfaces both a best-effort `role_names` list and the raw `roles_json` body.",
+			"(`GET /v1/organizations/roles`). Includes both built-in and custom roles, each with its " +
+			"URL-safe `label`, display `name`, `built_in` flag, and the list of `resource:scope` " +
+			"`permissions` it grants. Use a role's `label` when assigning it via " +
+			"`opusdns_user_role_assignment`.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{Computed: true, MarkdownDescription: "Static identifier."},
-			"role_names": schema.ListAttribute{
-				Computed:    true,
-				ElementType: types.StringType,
-				MarkdownDescription: "Role names extracted from the response. Each entry is the `name`, " +
-					"`role`, `id`, or `value` field of an object element, or the element itself if the " +
-					"response is a bare list of strings.",
-			},
-			"roles_json": schema.StringAttribute{
+			"roles": schema.ListNestedAttribute{
 				Computed:            true,
-				MarkdownDescription: "Raw JSON response body. Useful when callers need fields beyond `role_names`.",
+				MarkdownDescription: "All roles available in the organization.",
+				NestedObject: schema.NestedAttributeObject{
+					Attributes: map[string]schema.Attribute{
+						"label":       schema.StringAttribute{Computed: true, MarkdownDescription: "URL-safe, per-organization unique role identifier (e.g. `support_staff`). Use this when assigning the role."},
+						"name":        schema.StringAttribute{Computed: true, MarkdownDescription: "Human-readable display name (e.g. `Support Staff`)."},
+						"description": schema.StringAttribute{Computed: true, MarkdownDescription: "Optional description of the role, or empty if unset."},
+						"built_in":    schema.BoolAttribute{Computed: true, MarkdownDescription: "Whether this is an immutable built-in role (`true`) or an organization-owned custom role (`false`)."},
+						"permissions": schema.ListAttribute{
+							Computed:            true,
+							ElementType:         types.StringType,
+							MarkdownDescription: "The `resource:scope` permission strings the role grants (e.g. `domains:read`, `dns:manage`).",
+						},
+					},
+				},
 			},
 		},
 	}
@@ -78,74 +91,54 @@ func (d *RolesDataSource) Configure(_ context.Context, req datasource.ConfigureR
 }
 
 func (d *RolesDataSource) Read(ctx context.Context, _ datasource.ReadRequest, resp *datasource.ReadResponse) {
-	path := d.client.HTTPClient().BuildPath("organizations", "roles")
-	httpResp, err := d.client.HTTPClient().Get(ctx, path, nil)
+	roles, err := d.client.Organizations.ListRoles(ctx)
 	if err != nil {
 		resp.Diagnostics.AddError("Error listing roles", formatAPIError(err))
 		return
 	}
 
-	// Decode into a generic interface so we can both stash the raw bytes and
-	// best-effort extract role names.
-	var raw interface{}
-	if err := d.client.HTTPClient().DecodeResponse(httpResp, &raw); err != nil {
-		resp.Diagnostics.AddError("Error decoding roles response", formatAPIError(err))
-		return
+	objType := types.ObjectType{AttrTypes: roleAttrTypes}
+	values := make([]attr.Value, len(roles))
+	for i, role := range roles {
+		obj, diags := roleDefinitionToObject(ctx, role)
+		resp.Diagnostics.Append(diags...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
+		values[i] = obj
 	}
 
-	jsonBytes, _ := json.Marshal(raw)
-
-	names := extractRoleNames(raw)
-	listValue, diags := types.ListValueFrom(ctx, types.StringType, names)
+	list, diags := types.ListValue(objType, values)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
 	data := RolesDataSourceModel{
-		ID:        types.StringValue("roles"),
-		RoleNames: listValue,
-		RolesJSON: types.StringValue(string(jsonBytes)),
+		ID:    types.StringValue("roles"),
+		Roles: list,
 	}
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
-// extractRoleNames pulls role names out of an arbitrarily-shaped JSON
-// response. It handles the three shapes most likely to be returned:
-//
-//   - ["admin", "member", ...]
-//   - [{"name": "admin"}, {"name": "member"}, ...]
-//   - {"relations": [...]}, {"results": [...]}, {"roles": [...]}, etc.
-func extractRoleNames(raw interface{}) []string {
-	switch v := raw.(type) {
-	case []interface{}:
-		return extractFromSlice(v)
-	case map[string]interface{}:
-		for _, key := range []string{"relations", "results", "roles", "role_names", "data", "items"} {
-			if inner, ok := v[key]; ok {
-				if slice, ok := inner.([]interface{}); ok {
-					return extractFromSlice(slice)
-				}
-			}
-		}
+// roleDefinitionToObject converts an SDK RoleDefinition into a Terraform Object
+// value matching roleAttrTypes.
+func roleDefinitionToObject(ctx context.Context, role models.RoleDefinition) (types.Object, diag.Diagnostics) {
+	permissions, diags := types.ListValueFrom(ctx, types.StringType, role.Permissions)
+	if diags.HasError() {
+		return types.ObjectNull(roleAttrTypes), diags
 	}
-	return []string{}
-}
-
-func extractFromSlice(items []interface{}) []string {
-	out := make([]string, 0, len(items))
-	for _, it := range items {
-		switch v := it.(type) {
-		case string:
-			out = append(out, v)
-		case map[string]interface{}:
-			for _, key := range []string{"name", "role", "id", "value", "role_name"} {
-				if s, ok := v[key].(string); ok {
-					out = append(out, s)
-					break
-				}
-			}
-		}
+	description := ""
+	if role.Description != nil {
+		description = *role.Description
 	}
-	return out
+	obj, oDiags := types.ObjectValue(roleAttrTypes, map[string]attr.Value{
+		"label":       types.StringValue(role.Label),
+		"name":        types.StringValue(role.Name),
+		"description": types.StringValue(description),
+		"built_in":    types.BoolValue(role.BuiltIn),
+		"permissions": permissions,
+	})
+	diags.Append(oDiags...)
+	return obj, diags
 }

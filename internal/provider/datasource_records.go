@@ -219,7 +219,7 @@ func rrsetToObjectValue(rr models.RRSet, zoneName string) (attr.Value, diag.Diag
 		"ttl":              types.Int64Value(int64(rr.TTL)),
 		"records":          rdataList,
 		"protected":        types.BoolValue(rr.Protected),
-		"protected_reason": stringPtrToValue(rr.ProtectedReason),
+		"protected_reason": protectedReasonToValue(rr.ProtectedReason),
 	})
 	diags.Append(oDiags...)
 	return obj, diags

@@ -134,8 +134,8 @@ github.com/mitchellh/reflectwalk v1.0.2 h1:G2LzWKi524PWgd3mLHV8Y5k7s6XUvT0Gef6zx
 github.com/mitchellh/reflectwalk v1.0.2/go.mod h1:mSTlrgnPZtwu0c4WaC2kGObEpuNDbx0jmZXqmk4esnw=
 github.com/oklog/run v1.2.0 h1:O8x3yXwah4A73hJdlrwo/2X6J62gE5qTMusH0dvz60E=
 github.com/oklog/run v1.2.0/go.mod h1:mgDbKRSwPhJfesJ4PntqFUbKQRZ50NgmZTSPlFA0YFk=
-github.com/opusdns/opusdns-go-client v1.0.10 h1:lkFfn+zAqF+p28GBlHWeUvOHj/Rgox922IOTtIES770=
-github.com/opusdns/opusdns-go-client v1.0.10/go.mod h1:lQ6n/aAB9DF6OLjH+8ToGMp/MJzOsE4dQLb8mRG8dXo=
+github.com/opusdns/opusdns-go-client v1.1.1 h1:2vhrKCxvMCtzIGmIwcgpoImJenzh6DXGeqaEEFRtBm4=
+github.com/opusdns/opusdns-go-client v1.1.1/go.mod h1:zKt+jJiD/6cq9aYyKjORCQyjVz8ZBX4su088MkG/oX4=
 github.com/pjbgf/sha1cd v0.3.2 h1:a9wb0bp1oC2TGwStyn0Umc/IGKQnEgF0vVaZ8QF8eo4=
 github.com/pjbgf/sha1cd v0.3.2/go.mod h1:zQWigSxVmsHEZow5qaLtPYxpcKMMQpa09ixqBxuCS6A=
 github.com/pmezard/go-difflib v1.0.0/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZNVY4sRDYZ/4=

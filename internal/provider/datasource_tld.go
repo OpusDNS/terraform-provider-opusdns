@@ -397,7 +397,7 @@ func buildTLDPhasesList(phases []models.TLDPhase) (types.List, diag.Diagnostics)
 			requirements = *p.Requirements
 		}
 		obj, diags := types.ObjectValue(tldPhaseAttrTypes, map[string]attr.Value{
-			"name":              types.StringValue(p.Name),
+			"name":              types.StringValue(string(p.Name)),
 			"status":            types.StringValue(p.Status),
 			"start_date":        types.StringValue(startDate),
 			"end_date":          types.StringValue(endDate),

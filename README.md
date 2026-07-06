@@ -199,7 +199,9 @@ resource "opusdns_tag" "production" {
 
 ### `opusdns_domain`
 
-Registers and manages a domain (`/v1/domains`). `contacts`, `nameservers`, `renewal_mode`, and `transfer_lock` are updatable in place; all other inputs (name, period, `create_zone`, `auth_code`) force replacement. If `create_zone = true`, destroying the resource also attempts to delete the side-effect DNS zone.
+Registers and manages a domain (`/v1/domains`). `contacts`, `nameservers`, `renewal_mode`, and `transfer_lock` are updatable in place; all other inputs (name, period, `create_zone`, `transfer`, `auth_code`) force replacement. If `create_zone = true`, destroying the resource also attempts to delete the side-effect DNS zone.
+
+Set `transfer = true` (with `auth_code`) to transfer an existing domain in from another registrar (`POST /v1/domains/transfer`) instead of registering a new one. `create_zone` is not supported for transfers, and `period_unit` must be `y` (the transfer API accepts a year count only).
 
 ```hcl
 resource "opusdns_domain" "example" {
@@ -222,6 +224,26 @@ resource "opusdns_domain" "example" {
     { hostname = "ns1.opusdns.com" },
     { hostname = "ns2.opusdns.com" },
   ]
+}
+```
+
+Transfer-in from another registrar:
+
+```hcl
+resource "opusdns_domain" "transferred" {
+  name      = "transfer-me.com"
+  transfer  = true
+  auth_code = var.transfer_auth_code
+
+  period_value = 1
+  period_unit  = "y"
+
+  contacts = {
+    registrant = [opusdns_contact.admin.id]
+    admin      = [opusdns_contact.admin.id]
+    tech       = [opusdns_contact.admin.id]
+    billing    = [opusdns_contact.admin.id]
+  }
 }
 ```
 
