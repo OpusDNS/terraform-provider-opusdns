@@ -51,16 +51,19 @@ func (d *UserDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, r
 		MarkdownDescription: "Fetches a single user. Set `me = true` to look up the authenticated caller via `GET /v1/users/me`, " +
 			"otherwise provide `user_id` to look up `GET /v1/users/{user_id}`.",
 		Attributes: map[string]schema.Attribute{
-			"id":              schema.StringAttribute{Computed: true, MarkdownDescription: "Mirror of `user_id`."},
-			"user_id":         schema.StringAttribute{Optional: true, Computed: true, MarkdownDescription: "User id to look up. Required unless `me = true`."},
-			"me":              schema.BoolAttribute{Optional: true, MarkdownDescription: "When true, resolve via `/v1/users/me`."},
-			"username":        schema.StringAttribute{Computed: true},
-			"first_name":      schema.StringAttribute{Computed: true},
-			"last_name":       schema.StringAttribute{Computed: true},
-			"email":           schema.StringAttribute{Computed: true},
-			"phone":           schema.StringAttribute{Computed: true},
-			"locale":          schema.StringAttribute{Computed: true},
-			"status":          schema.StringAttribute{Computed: true},
+			"id":         schema.StringAttribute{Computed: true, MarkdownDescription: "Mirror of `user_id`."},
+			"user_id":    schema.StringAttribute{Optional: true, Computed: true, MarkdownDescription: "User id to look up. Required unless `me = true`."},
+			"me":         schema.BoolAttribute{Optional: true, MarkdownDescription: "When true, resolve via `/v1/users/me`."},
+			"username":   schema.StringAttribute{Computed: true},
+			"first_name": schema.StringAttribute{Computed: true},
+			"last_name":  schema.StringAttribute{Computed: true},
+			"email":      schema.StringAttribute{Computed: true},
+			"phone":      schema.StringAttribute{Computed: true},
+			"locale":     schema.StringAttribute{Computed: true},
+			"status": schema.StringAttribute{
+				Computed:           true,
+				DeprecationMessage: "The OpusDNS API no longer returns a user status; this attribute is always null and will be removed in a future release.",
+			},
 			"organization_id": schema.StringAttribute{Computed: true},
 			"created_on":      schema.StringAttribute{Computed: true},
 			"updated_on":      schema.StringAttribute{Computed: true},
@@ -121,7 +124,7 @@ func populateUserDataModel(data *UserDataSourceModel, u *models.User) {
 	data.LastName = types.StringValue(u.LastName)
 	data.Email = types.StringValue(u.Email)
 	data.Locale = types.StringValue(u.Locale)
-	data.Status = types.StringValue(string(u.Status))
+	data.Status = emptyStringAsNull(string(u.Status))
 	data.OrganizationID = types.StringValue(string(u.OrganizationID))
 	data.Phone = stringPtrToValue(u.Phone)
 

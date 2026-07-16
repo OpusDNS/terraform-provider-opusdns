@@ -27,7 +27,6 @@ func TestAccUserResource_basic(t *testing.T) {
 					resource.TestCheckResourceAttr("opusdns_user.test", "last_name", "Acceptance"),
 					resource.TestCheckResourceAttr("opusdns_user.test", "locale", "en_US"),
 					resource.TestCheckResourceAttrSet("opusdns_user.test", "organization_id"),
-					resource.TestCheckResourceAttrSet("opusdns_user.test", "status"),
 				),
 			},
 		},

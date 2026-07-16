@@ -98,7 +98,8 @@ func (r *UserResource) Schema(_ context.Context, _ resource.SchemaRequest, resp 
 			},
 			"status": schema.StringAttribute{
 				Computed:            true,
-				MarkdownDescription: "User status (`active`, `inactive`, `pending`).",
+				DeprecationMessage:  "The OpusDNS API no longer returns a user status; this attribute is always null and will be removed in a future release.",
+				MarkdownDescription: "User status. Deprecated: no longer returned by the OpusDNS API (always null).",
 				PlanModifiers:       useStateForUnknown,
 			},
 			"organization_id": schema.StringAttribute{
@@ -279,7 +280,7 @@ func populateUserModel(data *UserResourceModel, u *models.User) {
 	data.LastName = types.StringValue(u.LastName)
 	data.Email = types.StringValue(u.Email)
 	data.Locale = types.StringValue(u.Locale)
-	data.Status = types.StringValue(string(u.Status))
+	data.Status = emptyStringAsNull(string(u.Status))
 	data.OrganizationID = types.StringValue(string(u.OrganizationID))
 
 	data.Phone = normalizedPhoneValue(u.Phone)
