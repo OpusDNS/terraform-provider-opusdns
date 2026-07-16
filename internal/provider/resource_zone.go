@@ -34,13 +34,14 @@ func normalizedDNSSECStatus(status string) types.String {
 
 // ZoneResourceModel describes the resource data model.
 type ZoneResourceModel struct {
-	ID           fqdnValue    `tfsdk:"id"`
-	ZoneID       types.String `tfsdk:"zone_id"`
-	Name         fqdnValue    `tfsdk:"name"`
-	DNSSECStatus types.String `tfsdk:"dnssec_status"`
-	Tags         types.List   `tfsdk:"tags"`
-	CreatedOn    types.String `tfsdk:"created_on"`
-	UpdatedOn    types.String `tfsdk:"updated_on"`
+	ID                    fqdnValue    `tfsdk:"id"`
+	ZoneID                types.String `tfsdk:"zone_id"`
+	Name                  fqdnValue    `tfsdk:"name"`
+	DNSSECStatus          types.String `tfsdk:"dnssec_status"`
+	VanityNameserverSetID types.String `tfsdk:"vanity_nameserver_set_id"`
+	Tags                  types.List   `tfsdk:"tags"`
+	CreatedOn             types.String `tfsdk:"created_on"`
+	UpdatedOn             types.String `tfsdk:"updated_on"`
 }
 
 // NewZoneResource returns a new ZoneResource.
@@ -100,6 +101,16 @@ func (r *ZoneResource) Schema(_ context.Context, _ resource.SchemaRequest, resp 
 				Computed:            true,
 				MarkdownDescription: "The DNSSEC status of the zone. Valid values: `enabled`, `disabled`.",
 			},
+			"vanity_nameserver_set_id": schema.StringAttribute{
+				Optional: true,
+				Computed: true,
+				MarkdownDescription: "The id of the vanity nameserver set (`vns_...`) whose apex `NS` + `SOA` brand this zone. " +
+					"When omitted, the API applies the organization's default vanity nameserver set (if any), and the resolved value is stored as computed. " +
+					"Manage sets with the `opusdns_vanity_nameserver_set` resource.",
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
+			},
 			"tags": schema.ListNestedAttribute{
 				Computed:            true,
 				MarkdownDescription: "Tags assigned to the zone. The resource always requests `include=tags` during refresh.",
@@ -151,6 +162,10 @@ func (r *ZoneResource) Create(ctx context.Context, req resource.CreateRequest, r
 	}
 	if !data.DNSSECStatus.IsNull() && !data.DNSSECStatus.IsUnknown() {
 		createReq.DNSSECStatus = models.DNSSECStatus(data.DNSSECStatus.ValueString())
+	}
+	if !data.VanityNameserverSetID.IsNull() && !data.VanityNameserverSetID.IsUnknown() {
+		setID := models.VanityNameserverSetID(data.VanityNameserverSetID.ValueString())
+		createReq.VanityNameserverSetID = &setID
 	}
 
 	requestedName := data.Name.ValueString()
@@ -266,6 +281,19 @@ func (r *ZoneResource) Update(ctx context.Context, req resource.UpdateRequest, r
 		}
 	}
 
+	// vanity_nameserver_set_id is Optional+Computed. Only call the vanity-set
+	// endpoint when the user explicitly configured a value that differs from
+	// state. When the config is null (plan value unknown, filled from state),
+	// leave the API untouched and keep the computed value from Read.
+	if !plan.VanityNameserverSetID.IsNull() && !plan.VanityNameserverSetID.IsUnknown() &&
+		!plan.VanityNameserverSetID.Equal(state.VanityNameserverSetID) {
+		setID := models.VanityNameserverSetID(plan.VanityNameserverSetID.ValueString())
+		if _, err := r.client.DNS.SetZoneVanitySet(ctx, stateName, &setID); err != nil {
+			resp.Diagnostics.AddError("Error setting zone vanity nameserver set", formatAPIError(err))
+			return
+		}
+	}
+
 	// Re-read current state.
 	zone, err := r.client.DNS.GetZoneWithOptions(ctx, stateName, &models.GetZoneOptions{Include: []models.ZoneIncludeField{models.ZoneIncludeTags}})
 	if err != nil {
@@ -354,6 +382,7 @@ func populateZoneResourceModel(data *ZoneResourceModel, zone *models.Zone, name 
 	data.ZoneID = types.StringValue(string(zone.ZoneID))
 	data.Name = fqdnValue{StringValue: types.StringValue(name)}
 	data.DNSSECStatus = normalizedDNSSECStatus(string(zone.DNSSECStatus))
+	data.VanityNameserverSetID = vanityNameserverSetIDToValue(zone.VanityNameserverSetID)
 	data.CreatedOn = timePtrToValue(zone.CreatedOn)
 	data.UpdatedOn = timePtrToValue(zone.UpdatedOn)
 	tags, d := tagEnrichedListValue(zone.Tags)

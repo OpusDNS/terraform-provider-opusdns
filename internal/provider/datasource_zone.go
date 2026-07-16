@@ -21,14 +21,15 @@ type ZoneDataSource struct {
 
 // ZoneDataSourceModel describes the data source data model.
 type ZoneDataSourceModel struct {
-	ID           fqdnValue    `tfsdk:"id"`
-	ZoneID       types.String `tfsdk:"zone_id"`
-	Name         fqdnValue    `tfsdk:"name"`
-	DNSSECStatus types.String `tfsdk:"dnssec_status"`
-	IncludeTags  types.Bool   `tfsdk:"include_tags"`
-	Tags         types.List   `tfsdk:"tags"`
-	CreatedOn    types.String `tfsdk:"created_on"`
-	UpdatedOn    types.String `tfsdk:"updated_on"`
+	ID                    fqdnValue    `tfsdk:"id"`
+	ZoneID                types.String `tfsdk:"zone_id"`
+	Name                  fqdnValue    `tfsdk:"name"`
+	DNSSECStatus          types.String `tfsdk:"dnssec_status"`
+	VanityNameserverSetID types.String `tfsdk:"vanity_nameserver_set_id"`
+	IncludeTags           types.Bool   `tfsdk:"include_tags"`
+	Tags                  types.List   `tfsdk:"tags"`
+	CreatedOn             types.String `tfsdk:"created_on"`
+	UpdatedOn             types.String `tfsdk:"updated_on"`
 }
 
 // NewZoneDataSource returns a new ZoneDataSource.
@@ -61,6 +62,10 @@ func (d *ZoneDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, r
 			"dnssec_status": schema.StringAttribute{
 				Computed:            true,
 				MarkdownDescription: "The DNSSEC status of the zone (`enabled` or `disabled`).",
+			},
+			"vanity_nameserver_set_id": schema.StringAttribute{
+				Computed:            true,
+				MarkdownDescription: "The id of the vanity nameserver set (`vns_...`) branding this zone's apex `NS` + `SOA`, or null when the zone uses OpusDNS system defaults.",
 			},
 			"include_tags": schema.BoolAttribute{Optional: true, MarkdownDescription: "When true, request `include=tags` and populate `tags` in state."},
 			"tags": schema.ListNestedAttribute{
@@ -117,6 +122,7 @@ func (d *ZoneDataSource) Read(ctx context.Context, req datasource.ReadRequest, r
 	data.ZoneID = types.StringValue(string(zone.ZoneID))
 	data.Name = fqdnValue{StringValue: types.StringValue(resolvedName)}
 	data.DNSSECStatus = normalizedDNSSECStatus(string(zone.DNSSECStatus))
+	data.VanityNameserverSetID = vanityNameserverSetIDToValue(zone.VanityNameserverSetID)
 	tagList, diags := tagEnrichedListValue(zone.Tags)
 	resp.Diagnostics.Append(diags...)
 	data.Tags = tagList

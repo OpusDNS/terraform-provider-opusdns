@@ -2,12 +2,12 @@
 page_title: "opusdns_user_role_assignment Resource - opusdns"
 subcategory: "Team"
 description: |-
-  Manages the set of roles (SpiceDB relations) assigned to a single user via PATCH /v1/users/{user_id}/roles. The resource models the desired total set of roles declaratively: each apply diffs the current API state against the configured set and issues the minimum add/remove batch needed to converge. Destroying the resource removes the configured roles from the user (but leaves the user itself intact). Valid role values come from the API's Relation enum (see common/schemas/authorization/rbac.py).
+  Manages the single role assigned to a user via PUT /v1/users/{user_id}/role. A user has exactly one role: a built-in role name (e.g. admin, member) or the label of a custom role owned by the user's organization (see the opusdns_role resource and opusdns_roles data source). Setting role replaces any existing role; destroying the resource clears the user's role. Changing user_id forces replacement.
 ---
 
 # opusdns_user_role_assignment (Resource)
 
-Manages the set of roles (SpiceDB relations) assigned to a single user via `PATCH /v1/users/{user_id}/roles`. The resource models the **desired total set** of roles declaratively: each apply diffs the current API state against the configured set and issues the minimum `add`/`remove` batch needed to converge. Destroying the resource removes the configured roles from the user (but leaves the user itself intact). Valid role values come from the API's `Relation` enum (see `common/schemas/authorization/rbac.py`).
+Manages the single role assigned to a user via `PUT /v1/users/{user_id}/role`. A user has exactly one role: a built-in role name (e.g. `admin`, `member`) or the `label` of a custom role owned by the user's organization (see the `opusdns_role` resource and `opusdns_roles` data source). Setting `role` replaces any existing role; destroying the resource clears the user's role. Changing `user_id` forces replacement.
 
 Allowed roles: `admin`, `api_admin`, `billing_manager`, `chat_manager`, `cms_content_editor`, `contact_manager`, `domain_forward_manager`, `domain_manager`, `email_forward_manager`, `events_manager`, `host_manager`, `member`, `organization_manager`, `product_manager`, `registrar_credential_manager`, `reseller_manager`.
 
@@ -30,8 +30,8 @@ resource "opusdns_user_role_assignment" "alice" {
 
 ### Required
 
-- `roles` (Set of String) Desired total set of roles the user should hold. Allowed values: `admin`, `api_admin`, `billing_manager`, `chat_manager`, `cms_content_editor`, `contact_manager`, `domain_forward_manager`, `domain_manager`, `email_forward_manager`, `events_manager`, `host_manager`, `member`, `organization_manager`, `product_manager`, `registrar_credential_manager`, `reseller_manager`.
-- `user_id` (String) ID of the user whose roles are being managed (e.g. `user_...`). Changing this forces replacement.
+- `role` (String) The role to assign to the user: a built-in assignable role name or the `label` of a custom role owned by the user's organization.
+- `user_id` (String) ID of the user whose role is being managed (e.g. `user_...`). Changing this forces replacement.
 
 ### Read-Only
 

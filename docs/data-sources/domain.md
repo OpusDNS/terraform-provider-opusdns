@@ -36,7 +36,7 @@ output "expires_on" {
 
 ### Optional
 
-- `include_tags` (Boolean) When true, request `include=tags` and populate `tags` in state.
+- `include_tags` (Boolean) When true, request `include=tags` and populate `tags` and `status_tags` in state.
 
 ### Read-Only
 
@@ -55,6 +55,7 @@ output "expires_on" {
 - `registry_statuses` (List of String)
 - `renewal_mode` (String)
 - `sld` (String)
+- `status_tags` (List of String) System-managed status tag types on the domain (e.g. `VERIFICATION_REQUIRED`). Populated only when `include_tags` is true; otherwise empty.
 - `tags` (Attributes List) Tags assigned to the domain when `include_tags` is true. (see [below for nested schema](#nestedatt--tags))
 - `tld` (String)
 - `transfer_lock` (Boolean)

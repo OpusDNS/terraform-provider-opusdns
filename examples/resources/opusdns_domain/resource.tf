@@ -49,3 +49,17 @@ resource "opusdns_domain" "transferred" {
     billing    = [opusdns_contact.registrant.contact_id]
   }
 }
+
+# Register a premium domain, confirming the expected price, and accept a TMCH
+# claims notice during the claims phase. Both fields are create-only: they are
+# sent with the registration request and are never read back into state.
+resource "opusdns_domain" "premium" {
+  name = "premium.example"
+
+  expected_price                = 149.99
+  claims_notice_acceptance_hash = var.claims_notice_acceptance_hash
+
+  contacts = {
+    registrant = [opusdns_contact.registrant.contact_id]
+  }
+}

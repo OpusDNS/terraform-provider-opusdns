@@ -48,5 +48,3 @@ output "registrant_email" {
 - `street` (String)
 - `title` (String)
 - `updated_on` (String) RFC3339 timestamp when the contact was last updated.
-- `verified` (Boolean)
-- `verified_on` (String) RFC3339 timestamp when the contact was verified, if any.

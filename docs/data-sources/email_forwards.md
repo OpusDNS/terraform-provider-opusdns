@@ -2,12 +2,12 @@
 page_title: "opusdns_email_forwards Data Source - opusdns"
 subcategory: "Forwarding"
 description: |-
-  Lists all email forwards configured for a zone via GET /v1/zones/{zone}/email-forwards.
+  Lists all email forwards configured for a zone via GET /v1/dns/{zone_name}/email-forwards.
 ---
 
 # opusdns_email_forwards (Data Source)
 
-Lists all email forwards configured for a zone via `GET /v1/zones/{zone}/email-forwards`.
+Lists all email forwards configured for a zone via `GET /v1/dns/{zone_name}/email-forwards`.
 
 ## Example Usage
 

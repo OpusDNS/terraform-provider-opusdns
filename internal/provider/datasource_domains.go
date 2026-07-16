@@ -50,6 +50,8 @@ type DomainsDataSourceModel struct {
 	RegisteredAfter    types.String `tfsdk:"registered_after"`
 	RegisteredBefore   types.String `tfsdk:"registered_before"`
 	RegistryStatusesIn types.List   `tfsdk:"registry_statuses_in"`
+	StatusTags         types.List   `tfsdk:"status_tags"`
+	StatusTagMode      types.String `tfsdk:"status_tag_mode"`
 	Domains            types.List   `tfsdk:"domains"`
 }
 
@@ -68,6 +70,7 @@ var domainItemAttrTypes = map[string]attr.Type{
 	"nameservers":          types.ListType{ElemType: types.ObjectType{AttrTypes: nameserverAttrTypes}},
 	"contacts":             types.MapType{ElemType: contactsMapElemType},
 	"registry_statuses":    types.ListType{ElemType: types.StringType},
+	"status_tags":          types.ListType{ElemType: types.StringType},
 	"tags":                 types.ListType{ElemType: types.ObjectType{AttrTypes: tagEnrichedAttrTypes}},
 	"auth_code_expires_on": types.StringType,
 	"registered_on":        types.StringType,
@@ -131,6 +134,15 @@ func (d *DomainsDataSource) Schema(_ context.Context, _ datasource.SchemaRequest
 				ElementType:         types.StringType,
 				MarkdownDescription: "Filter by registry statuses. Multiple values are sent as repeated API parameters.",
 			},
+			"status_tags": schema.ListAttribute{
+				Optional:            true,
+				ElementType:         types.StringType,
+				MarkdownDescription: "Filter by system-managed status tag types (e.g. `VERIFICATION_REQUIRED`). Multiple values are sent as repeated `status_tags` query parameters. When set, each domain's computed `status_tags` is also populated.",
+			},
+			"status_tag_mode": schema.StringAttribute{
+				Optional:            true,
+				MarkdownDescription: "How to combine `status_tags`: `match_any` (default) matches domains with at least one of the tags; `match_all` matches domains with every tag.",
+			},
 
 			"domains": schema.ListNestedAttribute{
 				Computed:            true,
@@ -157,6 +169,11 @@ func (d *DomainsDataSource) Schema(_ context.Context, _ datasource.SchemaRequest
 						},
 						"contacts":          schema.MapAttribute{Computed: true, ElementType: contactsMapElemType},
 						"registry_statuses": schema.ListAttribute{Computed: true, ElementType: types.StringType},
+						"status_tags": schema.ListAttribute{
+							Computed:            true,
+							ElementType:         types.StringType,
+							MarkdownDescription: "System-managed status tag types on the domain (e.g. `VERIFICATION_REQUIRED`). Populated only when `status_tags` filters are set or `include_tags` is true; otherwise empty.",
+						},
 						"tags": schema.ListNestedAttribute{
 							Computed:            true,
 							MarkdownDescription: "Tags assigned to the domain when `include_tags` is true.",
@@ -292,68 +309,54 @@ func (d *DomainsDataSource) Read(ctx context.Context, req datasource.ReadRequest
 		opts.RegistryStatuses = raw
 	}
 
-	domains, err := d.client.Domains.ListDomains(ctx, opts)
-	if err != nil {
-		resp.Diagnostics.AddError("Error listing domains", formatAPIError(err))
+	statusTagFilters, diags := stringListValueToStrings(ctx, data.StatusTags)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
 		return
 	}
+	statusTagMode := stringValue(data.StatusTagMode)
+	includeTags := !data.IncludeTags.IsNull() && !data.IncludeTags.IsUnknown() && data.IncludeTags.ValueBool()
+
+	// The SDK's ListDomainsOptions cannot express the status-tag filters, and
+	// its models.Domain omits the status_tags array. Fall back to the raw HTTP
+	// wrapper only when the caller filters by status tags or requests tags via
+	// include_tags (which also carries status_tags). Otherwise keep the SDK
+	// path so no existing filter behaviour regresses.
+	useRawStatusTags := len(statusTagFilters) > 0 || includeTags
 
 	objType := types.ObjectType{AttrTypes: domainItemAttrTypes}
-	values := make([]attr.Value, len(domains))
-	for i := range domains {
-		dn := &domains[i]
+	var values []attr.Value
 
-		nsList, nd := nameserversAPIToList(ctx, dn.Nameservers)
-		resp.Diagnostics.Append(nd...)
-		if resp.Diagnostics.HasError() {
+	if useRawStatusTags {
+		rawDomains, err := rawListDomainsWithStatusTags(ctx, d.client, opts, statusTagFilters, statusTagMode)
+		if err != nil {
+			resp.Diagnostics.AddError("Error listing domains", formatAPIError(err))
 			return
 		}
-		cMap, cd := contactsAPIToMap(dn.Contacts, nil)
-		resp.Diagnostics.Append(cd...)
-		if resp.Diagnostics.HasError() {
+		values = make([]attr.Value, len(rawDomains))
+		for i := range rawDomains {
+			obj, diags := domainListItemObject(ctx, &rawDomains[i].Domain, statusTagTypesToStrings(rawDomains[i].StatusTags))
+			resp.Diagnostics.Append(diags...)
+			if resp.Diagnostics.HasError() {
+				return
+			}
+			values[i] = obj
+		}
+	} else {
+		domains, err := d.client.Domains.ListDomains(ctx, opts)
+		if err != nil {
+			resp.Diagnostics.AddError("Error listing domains", formatAPIError(err))
 			return
 		}
-		statusList, sd := stringSliceToList(dn.RegistryStatuses)
-		resp.Diagnostics.Append(sd...)
-		if resp.Diagnostics.HasError() {
-			return
+		values = make([]attr.Value, len(domains))
+		for i := range domains {
+			obj, diags := domainListItemObject(ctx, &domains[i], nil)
+			resp.Diagnostics.Append(diags...)
+			if resp.Diagnostics.HasError() {
+				return
+			}
+			values[i] = obj
 		}
-		tagsList, td := tagEnrichedListValue(dn.Tags)
-		resp.Diagnostics.Append(td...)
-		if resp.Diagnostics.HasError() {
-			return
-		}
-
-		renewalMode := types.StringNull()
-		if dn.RenewalMode != "" {
-			renewalMode = types.StringValue(string(dn.RenewalMode))
-		}
-
-		obj, diags := types.ObjectValue(domainItemAttrTypes, map[string]attr.Value{
-			"domain_id":            types.StringValue(string(dn.DomainID)),
-			"name":                 types.StringValue(dn.Name),
-			"sld":                  types.StringValue(dn.SLD),
-			"tld":                  types.StringValue(dn.TLD),
-			"owner_id":             types.StringValue(string(dn.OwnerID)),
-			"registry_account_id":  types.StringValue(string(dn.RegistryAccountID)),
-			"renewal_mode":         renewalMode,
-			"transfer_lock":        types.BoolValue(domainHasClientTransferProhibited(dn)),
-			"is_premium":           types.BoolValue(dn.IsPremium),
-			"nameservers":          nsList,
-			"contacts":             cMap,
-			"registry_statuses":    statusList,
-			"tags":                 tagsList,
-			"auth_code_expires_on": timePtrToValue(dn.AuthCodeExpiresOn),
-			"registered_on":        timePtrToValue(dn.RegisteredOn),
-			"expires_on":           timePtrToValue(dn.ExpiresOn),
-			"created_on":           timePtrToValue(dn.CreatedOn),
-			"updated_on":           timePtrToValue(dn.UpdatedOn),
-		})
-		resp.Diagnostics.Append(diags...)
-		if resp.Diagnostics.HasError() {
-			return
-		}
-		values[i] = obj
 	}
 
 	list, diags := types.ListValue(objType, values)
@@ -365,4 +368,76 @@ func (d *DomainsDataSource) Read(ctx context.Context, req datasource.ReadRequest
 	data.ID = types.StringValue("domains")
 	data.Domains = list
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
+}
+
+// domainListItemObject builds the per-domain object value for the `domains`
+// list attribute. statusTags, when non-nil, populates the computed
+// `status_tags` field; pass nil to leave it as an empty list.
+func domainListItemObject(ctx context.Context, dn *models.Domain, statusTags []string) (types.Object, diag.Diagnostics) {
+	var diags diag.Diagnostics
+
+	nsList, nd := nameserversAPIToList(ctx, dn.Nameservers)
+	diags.Append(nd...)
+	if diags.HasError() {
+		return types.ObjectNull(domainItemAttrTypes), diags
+	}
+	cMap, cd := contactsAPIToMap(dn.Contacts, nil)
+	diags.Append(cd...)
+	if diags.HasError() {
+		return types.ObjectNull(domainItemAttrTypes), diags
+	}
+	statusList, sd := stringSliceToList(dn.RegistryStatuses)
+	diags.Append(sd...)
+	if diags.HasError() {
+		return types.ObjectNull(domainItemAttrTypes), diags
+	}
+	statusTagList, std := stringSliceToList(statusTags)
+	diags.Append(std...)
+	if diags.HasError() {
+		return types.ObjectNull(domainItemAttrTypes), diags
+	}
+	tagsList, td := tagEnrichedListValue(dn.Tags)
+	diags.Append(td...)
+	if diags.HasError() {
+		return types.ObjectNull(domainItemAttrTypes), diags
+	}
+
+	renewalMode := types.StringNull()
+	if dn.RenewalMode != "" {
+		renewalMode = types.StringValue(string(dn.RenewalMode))
+	}
+
+	obj, oDiags := types.ObjectValue(domainItemAttrTypes, map[string]attr.Value{
+		"domain_id":            types.StringValue(string(dn.DomainID)),
+		"name":                 types.StringValue(dn.Name),
+		"sld":                  types.StringValue(dn.SLD),
+		"tld":                  types.StringValue(dn.TLD),
+		"owner_id":             types.StringValue(string(dn.OwnerID)),
+		"registry_account_id":  types.StringValue(string(dn.RegistryAccountID)),
+		"renewal_mode":         renewalMode,
+		"transfer_lock":        types.BoolValue(domainHasClientTransferProhibited(dn)),
+		"is_premium":           types.BoolValue(dn.IsPremium),
+		"nameservers":          nsList,
+		"contacts":             cMap,
+		"registry_statuses":    statusList,
+		"status_tags":          statusTagList,
+		"tags":                 tagsList,
+		"auth_code_expires_on": timePtrToValue(dn.AuthCodeExpiresOn),
+		"registered_on":        timePtrToValue(dn.RegisteredOn),
+		"expires_on":           timePtrToValue(dn.ExpiresOn),
+		"created_on":           timePtrToValue(dn.CreatedOn),
+		"updated_on":           timePtrToValue(dn.UpdatedOn),
+	})
+	diags.Append(oDiags...)
+	return obj, diags
+}
+
+// statusTagTypesToStrings maps StatusTagResponse rows to their tag_type
+// string values for exposure in state.
+func statusTagTypesToStrings(tags []models.StatusTagResponse) []string {
+	out := make([]string, len(tags))
+	for i, t := range tags {
+		out[i] = string(t.TagType)
+	}
+	return out
 }

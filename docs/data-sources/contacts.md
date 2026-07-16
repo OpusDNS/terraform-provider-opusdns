@@ -70,5 +70,3 @@ Read-Only:
 - `street` (String)
 - `title` (String)
 - `updated_on` (String)
-- `verified` (Boolean)
-- `verified_on` (String)

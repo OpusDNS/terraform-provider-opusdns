@@ -18,8 +18,6 @@ Lists audit events for the caller's organization with optional filters (`GET /v1
 ### Optional
 
 - `acknowledged` (Boolean) Filter by acknowledgement status.
-- `created_after` (String) RFC3339 timestamp; only events created strictly after this are returned.
-- `created_before` (String) RFC3339 timestamp; only events created strictly before this are returned.
 - `object_id` (String) Filter by the related object's ID.
 - `object_type` (String) Filter by related object type (e.g. `DOMAIN`, `ZONE`).
 - `page` (Number) 1-indexed page number to fetch.
@@ -38,15 +36,11 @@ Lists audit events for the caller's organization with optional filters (`GET /v1
 
 Read-Only:
 
+- `acknowledged_on` (String) RFC3339 timestamp of when the event was acknowledged, or empty if unacknowledged.
 - `created_on` (String) RFC3339 timestamp of when the event was recorded. Empty if unset.
 - `event_data_json` (String) JSON-encoded `event_data` payload. Decode with `jsondecode()` to access fields.
 - `event_id` (String) Unique event identifier.
-- `ip_address` (String) Client IP that triggered the event, or empty if unset.
 - `object_id` (String) ID of the related object, or empty if unset.
 - `object_type` (String) Type of object the event relates to (e.g. `DOMAIN`, `ZONE`, `CONTACT`).
-- `organization_id` (String) Organization the event belongs to, or empty if unset.
-- `source` (String) Event source (`api`, `dashboard`, `system`, etc.). Empty if unset.
 - `subtype` (String) Optional event subtype, or empty when unset.
 - `type` (String) Event type (e.g. `DOMAIN_CREATE`, `ZONE_UPDATE`, `NOTIFICATION`).
-- `user_agent` (String) Client user-agent string, or empty if unset.
-- `user_id` (String) User who triggered the event, or empty if system-generated.
