@@ -21,15 +21,11 @@ Fetches a single audit event by ID via `GET /v1/events/{event_id}`. The dynamic 
 
 ### Read-Only
 
+- `acknowledged_on` (String) RFC3339 timestamp of when the event was acknowledged, or empty if unacknowledged.
 - `created_on` (String) RFC3339 timestamp of when the event was recorded. Empty if unset.
 - `event_data_json` (String) JSON-encoded `event_data` payload. Decode with `jsondecode()` to access fields.
 - `id` (String) Same value as `event_id` — present so Terraform has a synthetic identifier.
-- `ip_address` (String) Client IP that triggered the event, or empty if unset.
 - `object_id` (String) ID of the related object, or empty if unset.
 - `object_type` (String) Type of object the event relates to (e.g. `DOMAIN`, `ZONE`, `CONTACT`).
-- `organization_id` (String) Organization the event belongs to, or empty if unset.
-- `source` (String) Event source (`api`, `dashboard`, `system`, etc.). Empty if unset.
 - `subtype` (String) Optional event subtype, or empty when unset.
 - `type` (String) Event type (e.g. `DOMAIN_CREATE`, `ZONE_UPDATE`, `NOTIFICATION`).
-- `user_agent` (String) Client user-agent string, or empty if unset.
-- `user_id` (String) User who triggered the event, or empty if system-generated.

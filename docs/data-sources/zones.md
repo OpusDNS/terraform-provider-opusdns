@@ -51,6 +51,7 @@ Read-Only:
 - `name` (String) The domain name of the zone.
 - `tags` (Attributes List) Tags assigned to the zone when `include_tags` is true. (see [below for nested schema](#nestedatt--zones--tags))
 - `updated_on` (String) RFC3339 timestamp when the zone was last updated.
+- `vanity_nameserver_set_id` (String) The id of the vanity nameserver set (`vns_...`) branding this zone, or null when the zone uses OpusDNS system defaults.
 - `zone_id` (String) Server-assigned DNS zone id (`dns_zone_id`).
 
 <a id="nestedatt--zones--tags"></a>

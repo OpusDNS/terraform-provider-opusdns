@@ -3,12 +3,12 @@
 page_title: "opusdns_domain_suggestions Data Source - opusdns"
 subcategory: ""
 description: |-
-  Returns ranked domain-name suggestions for a query string (GET /v1/domain-search/suggest). Each suggestion includes the candidate domain, its current availability status, a relevance score, and optional pricing.
+  Returns ranked domain-name suggestions for a query string (GET /v1/domain-search/suggest). Each suggestion includes the candidate domain, whether it is available, whether it is premium, and optional registration/renewal pricing.
 ---
 
 # opusdns_domain_suggestions (Data Source)
 
-Returns ranked domain-name suggestions for a query string (`GET /v1/domain-search/suggest`). Each suggestion includes the candidate domain, its current availability status, a relevance score, and optional pricing.
+Returns ranked domain-name suggestions for a query string (`GET /v1/domain-search/suggest`). Each suggestion includes the candidate domain, whether it is available, whether it is premium, and optional registration/renewal pricing.
 
 
 
@@ -21,8 +21,8 @@ Returns ranked domain-name suggestions for a query string (`GET /v1/domain-searc
 
 ### Optional
 
-- `include_unavailable` (Boolean) Whether to include unavailable suggestions in the response.
 - `limit` (Number) Maximum number of suggestions to return. Server default applies when omitted.
+- `premium` (Boolean) Whether to include premium domains in the suggestions. Server default applies when omitted.
 - `tlds` (List of String) Optional list of TLDs (without leading dot) to bias suggestions to.
 
 ### Read-Only
@@ -37,18 +37,27 @@ Returns ranked domain-name suggestions for a query string (`GET /v1/domain-searc
 
 Read-Only:
 
+- `available` (Boolean) Whether the suggested domain is available for registration.
 - `domain` (String) Suggested domain name.
-- `price` (Attributes) Optional pricing for the suggested domain. All string fields default to empty when the API omits them. (see [below for nested schema](#nestedatt--suggestions--price))
-- `score` (Number) Relevance score (higher is more relevant).
-- `status` (String) Availability status (e.g. `available`, `unavailable`, `premium`).
+- `premium` (Boolean) Whether the suggested domain is a premium domain.
+- `price` (Attributes) Registration pricing for the suggested domain. `amount` defaults to empty when the API omits it. (see [below for nested schema](#nestedatt--suggestions--price))
+- `renewal_price` (Attributes) Renewal pricing for the suggested domain, if provided. `amount` defaults to empty when the API omits it. (see [below for nested schema](#nestedatt--suggestions--renewal_price))
 
 <a id="nestedatt--suggestions--price"></a>
 ### Nested Schema for `suggestions.price`
 
 Read-Only:
 
+- `amount` (String)
 - `currency` (String)
-- `period` (Number)
-- `register_price` (String)
-- `renew_price` (String)
-- `transfer_price` (String)
+- `period` (String)
+
+
+<a id="nestedatt--suggestions--renewal_price"></a>
+### Nested Schema for `suggestions.renewal_price`
+
+Read-Only:
+
+- `amount` (String)
+- `currency` (String)
+- `period` (String)

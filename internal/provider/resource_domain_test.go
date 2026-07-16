@@ -5,10 +5,26 @@ import (
 	"math/rand"
 	"testing"
 
+	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 	"github.com/opusdns/opusdns-go-client/models"
 )
+
+// testContactsMap builds a minimal, valid contacts map value (a single
+// registrant) for exercising validateDomainConfig's registration rules.
+func testContactsMap(t *testing.T) types.Map {
+	t.Helper()
+	registrant, d := types.ListValue(types.StringType, []attr.Value{types.StringValue("contact_1")})
+	if d.HasError() {
+		t.Fatalf("building registrant list: %v", d)
+	}
+	m, d := types.MapValue(contactsMapElemType, map[string]attr.Value{"registrant": registrant})
+	if d.HasError() {
+		t.Fatalf("building contacts map: %v", d)
+	}
+	return m
+}
 
 func TestAccDomainResource_basic(t *testing.T) {
 	domainLabel := testAccDomainLabel()
@@ -218,9 +234,18 @@ func TestValidateDomainConfig(t *testing.T) {
 		wantError bool
 	}{
 		{
-			name:      "register path skips transfer rules",
-			mutate:    func(m *DomainResourceModel) { m.Transfer = types.BoolValue(false); m.AuthCode = types.StringNull() },
+			name: "register path with contacts skips transfer rules",
+			mutate: func(m *DomainResourceModel) {
+				m.Transfer = types.BoolValue(false)
+				m.AuthCode = types.StringNull()
+				m.Contacts = testContactsMap(t)
+			},
 			wantError: false,
+		},
+		{
+			name:      "register path missing contacts",
+			mutate:    func(m *DomainResourceModel) { m.Transfer = types.BoolValue(false); m.AuthCode = types.StringNull() },
+			wantError: true,
 		},
 		{
 			name:      "valid transfer",

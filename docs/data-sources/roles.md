@@ -2,12 +2,12 @@
 page_title: "opusdns_roles Data Source - opusdns"
 subcategory: "Team"
 description: |-
-  Lists all roles available in the authenticated caller's organization (GET /v1/organizations/roles). The API's response is untyped in the OpenAPI spec, so this data source surfaces both a best-effort role_names list and the raw roles_json body.
+  Lists all roles available in the authenticated caller's organization (GET /v1/organizations/roles). Includes both built-in and custom roles, each with its URL-safe label, display name, built_in flag, and the list of resource:scope permissions it grants. Use a role's label when assigning it via opusdns_user_role_assignment.
 ---
 
 # opusdns_roles (Data Source)
 
-Lists all roles available in the authenticated caller's organization (`GET /v1/organizations/roles`). The API's response is untyped in the OpenAPI spec, so this data source surfaces both a best-effort `role_names` list and the raw `roles_json` body.
+Lists all roles available in the authenticated caller's organization (`GET /v1/organizations/roles`). Includes both built-in and custom roles, each with its URL-safe `label`, display `name`, `built_in` flag, and the list of `resource:scope` `permissions` it grants. Use a role's `label` when assigning it via `opusdns_user_role_assignment`.
 
 ## Example Usage
 
@@ -25,5 +25,15 @@ output "available_roles" {
 ### Read-Only
 
 - `id` (String) Static identifier.
-- `role_names` (List of String) Role names extracted from the response. Each entry is the `name`, `role`, `id`, or `value` field of an object element, or the element itself if the response is a bare list of strings.
-- `roles_json` (String) Raw JSON response body. Useful when callers need fields beyond `role_names`.
+- `roles` (Attributes List) All roles available in the organization. (see [below for nested schema](#nestedatt--roles))
+
+<a id="nestedatt--roles"></a>
+### Nested Schema for `roles`
+
+Read-Only:
+
+- `built_in` (Boolean) Whether this is an immutable built-in role (`true`) or an organization-owned custom role (`false`).
+- `description` (String) Optional description of the role, or empty if unset.
+- `label` (String) URL-safe, per-organization unique role identifier (e.g. `support_staff`). Use this when assigning the role.
+- `name` (String) Human-readable display name (e.g. `Support Staff`).
+- `permissions` (List of String) The `resource:scope` permission strings the role grants (e.g. `domains:read`, `dns:manage`).

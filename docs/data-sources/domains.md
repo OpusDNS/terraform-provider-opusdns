@@ -49,6 +49,8 @@ output "domain_names" {
 - `search` (String) Free-text search over domain names.
 - `sld` (String) Filter by second-level domain.
 - `status` (String) Filter by domain lifecycle status (e.g. `ok`, `pendingTransfer`).
+- `status_tag_mode` (String) How to combine `status_tags`: `match_any` (default) matches domains with at least one of the tags; `match_all` matches domains with every tag.
+- `status_tags` (List of String) Filter by system-managed status tag types (e.g. `VERIFICATION_REQUIRED`). Multiple values are sent as repeated `status_tags` query parameters. When set, each domain's computed `status_tags` is also populated.
 - `tag_ids` (List of String) Filter by tag IDs. Multiple values are sent as repeated `tag_ids` query parameters.
 - `tag_mode` (String) Tag filter mode. Use `match_any` or `match_all` according to the API.
 - `tld` (String) Filter by top-level domain.
@@ -80,6 +82,7 @@ Read-Only:
 - `registry_statuses` (List of String)
 - `renewal_mode` (String)
 - `sld` (String)
+- `status_tags` (List of String) System-managed status tag types on the domain (e.g. `VERIFICATION_REQUIRED`). Populated only when `status_tags` filters are set or `include_tags` is true; otherwise empty.
 - `tags` (Attributes List) Tags assigned to the domain when `include_tags` is true. (see [below for nested schema](#nestedatt--domains--tags))
 - `tld` (String)
 - `transfer_lock` (Boolean)

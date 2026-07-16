@@ -56,7 +56,7 @@ func (d *EmailForwardsDataSource) Metadata(_ context.Context, req datasource.Met
 
 func (d *EmailForwardsDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		MarkdownDescription: "Lists all email forwards configured for a zone via `GET /v1/zones/{zone}/email-forwards`.",
+		MarkdownDescription: "Lists all email forwards configured for a zone via `GET /v1/dns/{zone_name}/email-forwards`.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Computed:            true,

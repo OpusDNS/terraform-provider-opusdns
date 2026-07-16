@@ -2,12 +2,12 @@
 page_title: "opusdns_domain_forwards Data Source - opusdns"
 subcategory: "Forwarding"
 description: |-
-  Lists all domain forwards configured for a zone via GET /v1/zones/{zone}/domain-forwards.
+  Lists all domain forwards configured for a zone via GET /v1/dns/{zone_name}/domain-forwards.
 ---
 
 # opusdns_domain_forwards (Data Source)
 
-Lists all domain forwards configured for a zone via `GET /v1/zones/{zone}/domain-forwards`.
+Lists all domain forwards configured for a zone via `GET /v1/dns/{zone_name}/domain-forwards`.
 
 ## Example Usage
 

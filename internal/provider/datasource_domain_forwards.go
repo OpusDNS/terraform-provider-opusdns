@@ -64,7 +64,7 @@ func (d *DomainForwardsDataSource) Schema(_ context.Context, _ datasource.Schema
 	}
 
 	resp.Schema = schema.Schema{
-		MarkdownDescription: "Lists all domain forwards configured for a zone via `GET /v1/zones/{zone}/domain-forwards`.",
+		MarkdownDescription: "Lists all domain forwards configured for a zone via `GET /v1/dns/{zone_name}/domain-forwards`.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Computed:            true,

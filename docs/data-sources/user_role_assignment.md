@@ -2,12 +2,12 @@
 page_title: "opusdns_user_role_assignment Data Source - opusdns"
 subcategory: "Team"
 description: |-
-  Fetches the set of roles (SpiceDB relations) currently assigned to a user via GET /v1/users/{user_id}/roles. The returned roles set is filtered to the provider-managed subset (see the opusdns_user_role_assignment resource for the allow-list); roles managed implicitly by the API (e.g. accepted_tos, owner, self) are omitted so the value lines up with what the matching resource would store in state.
+  Fetches the single role currently assigned to a user via GET /v1/users/{user_id}/role. The role is a built-in role name or the label of a custom role, or empty when the user has no role assigned.
 ---
 
 # opusdns_user_role_assignment (Data Source)
 
-Fetches the set of roles (SpiceDB relations) currently assigned to a user via `GET /v1/users/{user_id}/roles`. The returned `roles` set is filtered to the provider-managed subset (see the `opusdns_user_role_assignment` resource for the allow-list); roles managed implicitly by the API (e.g. `accepted_tos`, `owner`, `self`) are omitted so the value lines up with what the matching resource would store in state.
+Fetches the single role currently assigned to a user via `GET /v1/users/{user_id}/role`. The `role` is a built-in role name or the `label` of a custom role, or empty when the user has no role assigned.
 
 ## Example Usage
 
@@ -26,9 +26,9 @@ output "alice_roles" {
 
 ### Required
 
-- `user_id` (String) ID of the user whose roles to fetch (e.g. `user_...`).
+- `user_id` (String) ID of the user whose role to fetch (e.g. `user_...`).
 
 ### Read-Only
 
 - `id` (String) Mirror of `user_id`.
-- `roles` (Set of String) Roles assigned to the user, filtered to the provider-managed subset.
+- `role` (String) The role assigned to the user, or empty when no role is assigned.

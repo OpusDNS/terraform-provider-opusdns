@@ -11,6 +11,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/boolplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/float64planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64default"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
@@ -34,29 +35,31 @@ type DomainResource struct {
 
 // DomainResourceModel describes the resource data model.
 type DomainResourceModel struct {
-	ID                types.String `tfsdk:"id"`
-	DomainID          types.String `tfsdk:"domain_id"`
-	Name              types.String `tfsdk:"name"`
-	SLD               types.String `tfsdk:"sld"`
-	TLD               types.String `tfsdk:"tld"`
-	OwnerID           types.String `tfsdk:"owner_id"`
-	RegistryAccountID types.String `tfsdk:"registry_account_id"`
-	PeriodValue       types.Int64  `tfsdk:"period_value"`
-	PeriodUnit        types.String `tfsdk:"period_unit"`
-	CreateZone        types.Bool   `tfsdk:"create_zone"`
-	Transfer          types.Bool   `tfsdk:"transfer"`
-	AuthCode          types.String `tfsdk:"auth_code"`
-	RenewalMode       types.String `tfsdk:"renewal_mode"`
-	TransferLock      types.Bool   `tfsdk:"transfer_lock"`
-	Nameservers       types.List   `tfsdk:"nameservers"`
-	Contacts          types.Map    `tfsdk:"contacts"`
-	RegistryStatuses  types.List   `tfsdk:"registry_statuses"`
-	IsPremium         types.Bool   `tfsdk:"is_premium"`
-	AuthCodeExpiresOn types.String `tfsdk:"auth_code_expires_on"`
-	RegisteredOn      types.String `tfsdk:"registered_on"`
-	ExpiresOn         types.String `tfsdk:"expires_on"`
-	CreatedOn         types.String `tfsdk:"created_on"`
-	UpdatedOn         types.String `tfsdk:"updated_on"`
+	ID                types.String  `tfsdk:"id"`
+	DomainID          types.String  `tfsdk:"domain_id"`
+	Name              types.String  `tfsdk:"name"`
+	SLD               types.String  `tfsdk:"sld"`
+	TLD               types.String  `tfsdk:"tld"`
+	OwnerID           types.String  `tfsdk:"owner_id"`
+	RegistryAccountID types.String  `tfsdk:"registry_account_id"`
+	PeriodValue       types.Int64   `tfsdk:"period_value"`
+	PeriodUnit        types.String  `tfsdk:"period_unit"`
+	CreateZone        types.Bool    `tfsdk:"create_zone"`
+	Transfer          types.Bool    `tfsdk:"transfer"`
+	AuthCode          types.String  `tfsdk:"auth_code"`
+	ExpectedPrice     types.Float64 `tfsdk:"expected_price"`
+	ClaimsNoticeHash  types.String  `tfsdk:"claims_notice_acceptance_hash"`
+	RenewalMode       types.String  `tfsdk:"renewal_mode"`
+	TransferLock      types.Bool    `tfsdk:"transfer_lock"`
+	Nameservers       types.List    `tfsdk:"nameservers"`
+	Contacts          types.Map     `tfsdk:"contacts"`
+	RegistryStatuses  types.List    `tfsdk:"registry_statuses"`
+	IsPremium         types.Bool    `tfsdk:"is_premium"`
+	AuthCodeExpiresOn types.String  `tfsdk:"auth_code_expires_on"`
+	RegisteredOn      types.String  `tfsdk:"registered_on"`
+	ExpiresOn         types.String  `tfsdk:"expires_on"`
+	CreatedOn         types.String  `tfsdk:"created_on"`
+	UpdatedOn         types.String  `tfsdk:"updated_on"`
 }
 
 // nameserverAttrTypes describes the object type used for items in the
@@ -90,8 +93,9 @@ func (r *DomainResource) Schema(_ context.Context, _ resource.SchemaRequest, res
 		MarkdownDescription: "Registers and manages a domain in OpusDNS via `POST /v1/domains` and `PATCH /v1/domains/{ref}`. " +
 			"Set `transfer = true` (with `auth_code`) to transfer an existing domain in from another registrar via `POST /v1/domains/transfer` instead of registering a new one. " +
 			"Updatable in place: `contacts`, `nameservers`, `renewal_mode`, `transfer_lock`. " +
-			"Other inputs (`name`, `period_*`, `create_zone`, `transfer`, `auth_code`) require replacement. " +
-			"Premium pricing confirmation, TMCH claims acceptance, restore, and DNSSEC are not modeled here; use the dedicated APIs / a future `opusdns_domain_dnssec` resource for those.",
+			"Other inputs (`name`, `period_*`, `create_zone`, `transfer`, `auth_code`, `expected_price`, `claims_notice_acceptance_hash`) require replacement. " +
+			"Set `expected_price` to confirm a premium registration and `claims_notice_acceptance_hash` to accept a TMCH claims notice during the claims phase. " +
+			"Restore and DNSSEC are not modeled here; use the dedicated APIs / the `opusdns_domain_dnssec` resource for those.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Computed:            true,
@@ -181,6 +185,23 @@ func (r *DomainResource) Schema(_ context.Context, _ resource.SchemaRequest, res
 					stringplanmodifier.UseStateForUnknown(),
 				},
 			},
+			"expected_price": schema.Float64Attribute{
+				Optional: true,
+				MarkdownDescription: "Expected price used to confirm registration of a premium domain. Create-only: it is sent with the " +
+					"registration request and is not returned by the API, so it is never stored back to state. Changing it forces replacement.",
+				PlanModifiers: []planmodifier.Float64{
+					float64planmodifier.RequiresReplace(),
+				},
+			},
+			"claims_notice_acceptance_hash": schema.StringAttribute{
+				Optional: true,
+				MarkdownDescription: "The `accept_hash` of the related TMCH claims notice, required to register a domain that matches a trademark " +
+					"during the claims phase (see the `opusdns_claims_notice` data source). Create-only: it is sent with the registration " +
+					"request and is not returned by the API, so it is never stored back to state. Changing it forces replacement.",
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.RequiresReplace(),
+				},
+			},
 			"renewal_mode": schema.StringAttribute{
 				Optional:            true,
 				Computed:            true,
@@ -214,9 +235,10 @@ func (r *DomainResource) Schema(_ context.Context, _ resource.SchemaRequest, res
 				},
 			},
 			"contacts": schema.MapAttribute{
-				Required:            true,
+				Optional:            true,
+				Computed:            true,
 				ElementType:         contactsMapElemType,
-				MarkdownDescription: "Contacts assigned to the domain, keyed by contact type (`registrant`, `admin`, `tech`, `billing`). Each value is a list of contact ids. Updatable in place.",
+				MarkdownDescription: "Contacts assigned to the domain, keyed by contact type (`registrant`, `admin`, `tech`, `billing`). Each value is a list of contact ids. Required for registration (`transfer = false`); optional for transfers when the TLD permits zero-minimum contact roles. Updatable in place.",
 			},
 			"registry_statuses": schema.ListAttribute{
 				Computed:            true,
@@ -313,12 +335,38 @@ func (r *DomainResource) Create(ctx context.Context, req resource.CreateRequest,
 			CreateZone:  data.CreateZone.ValueBool(),
 		}
 
-		created, err := r.client.Domains.CreateDomain(ctx, createReq)
-		if err != nil {
-			resp.Diagnostics.AddError("Error creating domain", formatAPIError(err))
-			return
+		hasExpectedPrice := !data.ExpectedPrice.IsNull() && !data.ExpectedPrice.IsUnknown()
+		hasClaimsHash := optionalStringPtr(data.ClaimsNoticeHash) != nil
+
+		if hasExpectedPrice || hasClaimsHash {
+			// The SDK's DomainCreateRequest cannot carry expected_price or
+			// claims_notice_acceptance_hash, so serialise the standard request
+			// to a JSON map, add the extra create-only fields, and POST it raw.
+			body, bErr := domainCreateRequestToMap(createReq)
+			if bErr != nil {
+				resp.Diagnostics.AddError("Error building domain registration request", bErr.Error())
+				return
+			}
+			if hasExpectedPrice {
+				body["expected_price"] = data.ExpectedPrice.ValueFloat64()
+			}
+			if hasClaimsHash {
+				body["claims_notice_acceptance_hash"] = data.ClaimsNoticeHash.ValueString()
+			}
+			created, err := rawCreateDomain(ctx, r.client, body)
+			if err != nil {
+				resp.Diagnostics.AddError("Error creating domain", formatAPIError(err))
+				return
+			}
+			domain = created
+		} else {
+			created, err := r.client.Domains.CreateDomain(ctx, createReq)
+			if err != nil {
+				resp.Diagnostics.AddError("Error creating domain", formatAPIError(err))
+				return
+			}
+			domain = created
 		}
-		domain = created
 	}
 
 	// The API doesn't accept transfer_lock at create/transfer time, so reconcile
@@ -512,6 +560,8 @@ func (r *DomainResource) ImportState(ctx context.Context, req resource.ImportSta
 	data.CreateZone = types.BoolValue(false)
 	data.Transfer = types.BoolValue(false)
 	data.AuthCode = types.StringNull()
+	data.ExpectedPrice = types.Float64Null()
+	data.ClaimsNoticeHash = types.StringNull()
 
 	resp.Diagnostics.Append(populateDomainResourceModel(ctx, &data, domain)...)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
@@ -526,6 +576,15 @@ func (r *DomainResource) ImportState(ctx context.Context, req resource.ImportSta
 func validateDomainConfig(data DomainResourceModel) diag.Diagnostics {
 	var diags diag.Diagnostics
 	if !data.Transfer.ValueBool() {
+		// Registration (not transfer) requires contacts; the transfer path may
+		// omit them for TLDs whose contact roles have a zero minimum.
+		if domainContactsEmpty(data.Contacts) {
+			diags.AddError(
+				"Missing contacts for domain registration",
+				"`contacts` is required when registering a domain (`transfer = false`). "+
+					"Provide at least the `registrant` contact. `contacts` may only be omitted for transfers.",
+			)
+		}
 		return diags
 	}
 
@@ -786,4 +845,15 @@ func domainHasClientTransferProhibited(d *models.Domain) bool {
 		}
 	}
 	return d.TransferLock
+}
+
+// domainContactsEmpty reports whether the contacts map is null/unknown or has
+// no entries. Used to enforce that registration (non-transfer) supplies
+// contacts, which the framework schema cannot express now that `contacts` is
+// Optional (to allow zero-contact transfers).
+func domainContactsEmpty(m types.Map) bool {
+	if m.IsNull() || m.IsUnknown() {
+		return true
+	}
+	return len(m.Elements()) == 0
 }

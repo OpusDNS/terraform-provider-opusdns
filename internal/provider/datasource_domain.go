@@ -40,6 +40,7 @@ type DomainDataSourceModel struct {
 	RegistryStatuses  types.List   `tfsdk:"registry_statuses"`
 	IncludeTags       types.Bool   `tfsdk:"include_tags"`
 	Tags              types.List   `tfsdk:"tags"`
+	StatusTags        types.List   `tfsdk:"status_tags"`
 	AuthCodeExpiresOn types.String `tfsdk:"auth_code_expires_on"`
 	RegisteredOn      types.String `tfsdk:"registered_on"`
 	ExpiresOn         types.String `tfsdk:"expires_on"`
@@ -86,7 +87,7 @@ func (d *DomainDataSource) Schema(_ context.Context, _ datasource.SchemaRequest,
 				MarkdownDescription: "Contacts grouped by type (`registrant`, `admin`, `tech`, `billing`).",
 			},
 			"registry_statuses": schema.ListAttribute{Computed: true, ElementType: types.StringType},
-			"include_tags":      schema.BoolAttribute{Optional: true, MarkdownDescription: "When true, request `include=tags` and populate `tags` in state."},
+			"include_tags":      schema.BoolAttribute{Optional: true, MarkdownDescription: "When true, request `include=tags` and populate `tags` and `status_tags` in state."},
 			"tags": schema.ListNestedAttribute{
 				Computed:            true,
 				MarkdownDescription: "Tags assigned to the domain when `include_tags` is true.",
@@ -95,6 +96,11 @@ func (d *DomainDataSource) Schema(_ context.Context, _ datasource.SchemaRequest,
 					"label":  schema.StringAttribute{Computed: true},
 					"color":  schema.StringAttribute{Computed: true},
 				}},
+			},
+			"status_tags": schema.ListAttribute{
+				Computed:            true,
+				ElementType:         types.StringType,
+				MarkdownDescription: "System-managed status tag types on the domain (e.g. `VERIFICATION_REQUIRED`). Populated only when `include_tags` is true; otherwise empty.",
 			},
 			"auth_code_expires_on": schema.StringAttribute{Computed: true},
 			"registered_on":        schema.StringAttribute{Computed: true},
@@ -128,15 +134,25 @@ func (d *DomainDataSource) Read(ctx context.Context, req datasource.ReadRequest,
 	}
 
 	var domain *models.Domain
+	var statusTags []string
 	var err error
-	if !data.IncludeTags.IsNull() && !data.IncludeTags.IsUnknown() && data.IncludeTags.ValueBool() {
-		domain, err = d.client.Domains.GetDomainWithOptions(ctx, data.DomainRef.ValueString(), &models.GetDomainOptions{Include: []models.DomainIncludeField{models.DomainIncludeTags}})
+	includeTags := !data.IncludeTags.IsNull() && !data.IncludeTags.IsUnknown() && data.IncludeTags.ValueBool()
+	if includeTags {
+		// The SDK's models.Domain omits the status_tags array, so use the raw
+		// include=tags wrapper to capture it alongside user tags.
+		raw, rErr := rawGetDomainWithStatusTags(ctx, d.client, data.DomainRef.ValueString())
+		if rErr != nil {
+			resp.Diagnostics.AddError("Error reading domain", formatAPIError(rErr))
+			return
+		}
+		domain = &raw.Domain
+		statusTags = statusTagTypesToStrings(raw.StatusTags)
 	} else {
 		domain, err = d.client.Domains.GetDomain(ctx, data.DomainRef.ValueString())
-	}
-	if err != nil {
-		resp.Diagnostics.AddError("Error reading domain", formatAPIError(err))
-		return
+		if err != nil {
+			resp.Diagnostics.AddError("Error reading domain", formatAPIError(err))
+			return
+		}
 	}
 	dn := domain
 
@@ -166,6 +182,9 @@ func (d *DomainDataSource) Read(ctx context.Context, req datasource.ReadRequest,
 	tagList, td := tagEnrichedListValue(dn.Tags)
 	resp.Diagnostics.Append(td...)
 	data.Tags = tagList
+	statusTagList, std := stringSliceToList(statusTags)
+	resp.Diagnostics.Append(std...)
+	data.StatusTags = statusTagList
 
 	nsList, nd := nameserversAPIToList(ctx, dn.Nameservers)
 	resp.Diagnostics.Append(nd...)

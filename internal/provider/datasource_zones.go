@@ -40,21 +40,23 @@ type ZonesDataSourceModel struct {
 
 // ZoneItemModel describes a single zone in the list.
 type ZoneItemModel struct {
-	ZoneID       types.String `tfsdk:"zone_id"`
-	Name         types.String `tfsdk:"name"`
-	DNSSECStatus types.String `tfsdk:"dnssec_status"`
-	Tags         types.List   `tfsdk:"tags"`
-	CreatedOn    types.String `tfsdk:"created_on"`
-	UpdatedOn    types.String `tfsdk:"updated_on"`
+	ZoneID                types.String `tfsdk:"zone_id"`
+	Name                  types.String `tfsdk:"name"`
+	DNSSECStatus          types.String `tfsdk:"dnssec_status"`
+	VanityNameserverSetID types.String `tfsdk:"vanity_nameserver_set_id"`
+	Tags                  types.List   `tfsdk:"tags"`
+	CreatedOn             types.String `tfsdk:"created_on"`
+	UpdatedOn             types.String `tfsdk:"updated_on"`
 }
 
 var zoneItemAttrTypes = map[string]attr.Type{
-	"zone_id":       types.StringType,
-	"name":          types.StringType,
-	"dnssec_status": types.StringType,
-	"tags":          types.ListType{ElemType: types.ObjectType{AttrTypes: tagEnrichedAttrTypes}},
-	"created_on":    types.StringType,
-	"updated_on":    types.StringType,
+	"zone_id":                  types.StringType,
+	"name":                     types.StringType,
+	"dnssec_status":            types.StringType,
+	"vanity_nameserver_set_id": types.StringType,
+	"tags":                     types.ListType{ElemType: types.ObjectType{AttrTypes: tagEnrichedAttrTypes}},
+	"created_on":               types.StringType,
+	"updated_on":               types.StringType,
 }
 
 // NewZonesDataSource returns a new ZonesDataSource.
@@ -105,6 +107,10 @@ func (d *ZonesDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, 
 						"dnssec_status": schema.StringAttribute{
 							Computed:            true,
 							MarkdownDescription: "The DNSSEC status of the zone.",
+						},
+						"vanity_nameserver_set_id": schema.StringAttribute{
+							Computed:            true,
+							MarkdownDescription: "The id of the vanity nameserver set (`vns_...`) branding this zone, or null when the zone uses OpusDNS system defaults.",
 						},
 						"tags": schema.ListNestedAttribute{
 							Computed:            true,
@@ -204,12 +210,13 @@ func (d *ZonesDataSource) Read(ctx context.Context, req datasource.ReadRequest, 
 			return
 		}
 		obj, diags := types.ObjectValue(zoneItemAttrTypes, map[string]attr.Value{
-			"zone_id":       types.StringValue(string(z.ZoneID)),
-			"name":          types.StringValue(canonicalZoneName(z.Name)),
-			"dnssec_status": normalizedDNSSECStatus(string(z.DNSSECStatus)),
-			"tags":          tagList,
-			"created_on":    timePtrToValue(z.CreatedOn),
-			"updated_on":    timePtrToValue(z.UpdatedOn),
+			"zone_id":                  types.StringValue(string(z.ZoneID)),
+			"name":                     types.StringValue(canonicalZoneName(z.Name)),
+			"dnssec_status":            normalizedDNSSECStatus(string(z.DNSSECStatus)),
+			"vanity_nameserver_set_id": vanityNameserverSetIDToValue(z.VanityNameserverSetID),
+			"tags":                     tagList,
+			"created_on":               timePtrToValue(z.CreatedOn),
+			"updated_on":               timePtrToValue(z.UpdatedOn),
 		})
 		resp.Diagnostics.Append(diags...)
 		if resp.Diagnostics.HasError() {

@@ -39,6 +39,7 @@ output "zone_dnssec_status" {
 - `id` (String) The zone name (used as the unique identifier).
 - `tags` (Attributes List) Tags assigned to the zone when `include_tags` is true. (see [below for nested schema](#nestedatt--tags))
 - `updated_on` (String) RFC3339 timestamp when the zone was last updated.
+- `vanity_nameserver_set_id` (String) The id of the vanity nameserver set (`vns_...`) branding this zone's apex `NS` + `SOA`, or null when the zone uses OpusDNS system defaults.
 - `zone_id` (String) Server-assigned DNS zone id (`dns_zone_id`).
 
 <a id="nestedatt--tags"></a>
