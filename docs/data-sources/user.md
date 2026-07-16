@@ -45,6 +45,6 @@ output "current_user_email" {
 - `locale` (String)
 - `organization_id` (String)
 - `phone` (String)
-- `status` (String)
+- `status` (String, Deprecated)
 - `updated_on` (String)
 - `username` (String)

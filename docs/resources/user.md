@@ -48,7 +48,7 @@ output "alice_user_id" {
 - `created_on` (String) RFC3339 timestamp the user was created.
 - `id` (String) Mirror of `user_id`.
 - `organization_id` (String) Organization the user belongs to.
-- `status` (String) User status (`active`, `inactive`, `pending`).
+- `status` (String, Deprecated) User status. Deprecated: no longer returned by the OpusDNS API (always null).
 - `updated_on` (String) RFC3339 timestamp the user was last updated.
 - `user_id` (String) Unique identifier for the user, e.g. `user_...`.
 

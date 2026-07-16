@@ -37,6 +37,6 @@ Read-Only:
 - `first_name` (String)
 - `last_name` (String)
 - `organization_id` (String)
-- `status` (String)
+- `status` (String, Deprecated)
 - `user_id` (String)
 - `username` (String)

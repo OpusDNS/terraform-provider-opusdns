@@ -50,6 +50,16 @@ func stringPtrToValue(p *string) types.String {
 	return types.StringValue(*p)
 }
 
+// emptyStringAsNull converts a string to a types.String, mapping the empty
+// string to null. Used for fields the API no longer returns (e.g. user
+// status), where the SDK decodes a zero value.
+func emptyStringAsNull(s string) types.String {
+	if s == "" {
+		return types.StringNull()
+	}
+	return types.StringValue(s)
+}
+
 // vanityNameserverSetIDToValue converts a *models.VanityNameserverSetID (a
 // pointer-typed id returned by the DNS zone API) into a types.String, mapping
 // nil to types.StringNull().
