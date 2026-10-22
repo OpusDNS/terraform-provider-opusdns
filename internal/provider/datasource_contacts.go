@@ -32,7 +32,6 @@ type ContactsDataSourceModel struct {
 	LastName      types.String `tfsdk:"last_name"`
 	Email         types.String `tfsdk:"email"`
 	Country       types.String `tfsdk:"country"`
-	Verified      types.Bool   `tfsdk:"verified"`
 	TagIDs        types.List   `tfsdk:"tag_ids"`
 	TagMode       types.String `tfsdk:"tag_mode"`
 	CreatedAfter  types.String `tfsdk:"created_after"`
@@ -57,7 +56,6 @@ var contactItemAttrTypes = map[string]attr.Type{
 	"country":         types.StringType,
 	"disclose":        types.BoolType,
 	"created_on":      types.StringType,
-	"updated_on":      types.StringType,
 }
 
 // NewContactsDataSource returns a new ContactsDataSource.
@@ -80,7 +78,6 @@ func (d *ContactsDataSource) Schema(_ context.Context, _ datasource.SchemaReques
 			"last_name":  schema.StringAttribute{Optional: true, MarkdownDescription: "Filter by exact last name."},
 			"email":      schema.StringAttribute{Optional: true, MarkdownDescription: "Filter by exact email address."},
 			"country":    schema.StringAttribute{Optional: true, MarkdownDescription: "Filter by ISO 3166-1 alpha-2 country code."},
-			"verified":   schema.BoolAttribute{Optional: true, MarkdownDescription: "Filter by verification status."},
 			"tag_ids": schema.ListAttribute{
 				Optional:            true,
 				ElementType:         types.StringType,
@@ -111,7 +108,6 @@ func (d *ContactsDataSource) Schema(_ context.Context, _ datasource.SchemaReques
 						"country":         schema.StringAttribute{Computed: true},
 						"disclose":        schema.BoolAttribute{Computed: true},
 						"created_on":      schema.StringAttribute{Computed: true},
-						"updated_on":      schema.StringAttribute{Computed: true},
 					},
 				},
 			},
@@ -147,10 +143,6 @@ func (d *ContactsDataSource) Read(ctx context.Context, req datasource.ReadReques
 		LastName:  stringValue(data.LastName),
 		Email:     stringValue(data.Email),
 		Country:   stringValue(data.Country),
-	}
-	if !data.Verified.IsNull() && !data.Verified.IsUnknown() {
-		v := data.Verified.ValueBool()
-		opts.Verified = &v
 	}
 	if !data.TagIDs.IsNull() && !data.TagIDs.IsUnknown() {
 		raw, diags := stringListValueToStrings(ctx, data.TagIDs)
@@ -203,7 +195,6 @@ func (d *ContactsDataSource) Read(ctx context.Context, req datasource.ReadReques
 			"country":         types.StringValue(c.Country),
 			"disclose":        types.BoolValue(c.Disclose),
 			"created_on":      timePtrToValue(c.CreatedOn),
-			"updated_on":      timePtrToValue(c.UpdatedOn),
 		})
 		resp.Diagnostics.Append(diags...)
 		if resp.Diagnostics.HasError() {

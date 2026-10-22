@@ -47,4 +47,3 @@ output "registrant_email" {
 - `state` (String)
 - `street` (String)
 - `title` (String)
-- `updated_on` (String) RFC3339 timestamp when the contact was last updated.

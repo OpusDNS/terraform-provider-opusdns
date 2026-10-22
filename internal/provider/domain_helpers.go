@@ -169,9 +169,6 @@ func buildDomainListQuery(opts *models.ListDomainsOptions) url.Values {
 	if opts.IsPremium != nil {
 		q.Set("is_premium", strconv.FormatBool(*opts.IsPremium))
 	}
-	if opts.RenewalMode != nil {
-		q.Set("renewal_mode", string(*opts.RenewalMode))
-	}
 	if opts.CreatedAfter != nil {
 		q.Set("created_after", opts.CreatedAfter.Format(time.RFC3339))
 	}
@@ -207,9 +204,6 @@ func buildDomainListQuery(opts *models.ListDomainsOptions) url.Values {
 	}
 	for _, status := range opts.RegistryStatuses {
 		q.Add("registry_statuses", status)
-	}
-	if opts.Status != "" {
-		q.Set("status", string(opts.Status))
 	}
 	return q
 }

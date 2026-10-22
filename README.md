@@ -513,16 +513,15 @@ data "opusdns_contact" "admin" {
 
 ### `data.opusdns_contacts`
 
-Lists contacts in the authenticated caller's organization (`GET /v1/contacts`). Optional `search`, `first_name`, `last_name`, `email`, `country`, and `verified` filters narrow the server-side query.
+Lists contacts in the authenticated caller's organization (`GET /v1/contacts`). Optional `search`, `first_name`, `last_name`, `email`, and `country` filters narrow the server-side query.
 
 ```hcl
-data "opusdns_contacts" "verified_us" {
-  country  = "US"
-  verified = true
+data "opusdns_contacts" "us" {
+  country = "US"
 }
 
 output "contact_emails" {
-  value = [for c in data.opusdns_contacts.verified_us.contacts : c.email]
+  value = [for c in data.opusdns_contacts.us.contacts : c.email]
 }
 ```
 
@@ -538,7 +537,7 @@ data "opusdns_domain" "example" {
 
 ### `data.opusdns_domains`
 
-Lists domains in the authenticated caller's organization (`GET /v1/domains`). Optional `search`, `name`, `tld`, `sld`, `status`, `renewal_mode`, `transfer_lock`, and `is_premium` filters narrow the server-side query.
+Lists domains in the authenticated caller's organization (`GET /v1/domains`). Optional `search`, `name`, `tld`, `sld`, `transfer_lock`, and `is_premium` filters narrow the server-side query.
 
 ```hcl
 data "opusdns_domains" "com" {
@@ -709,7 +708,7 @@ output "credential_names" {
 
 ### `data.opusdns_tld`
 
-Fetches detailed information for a single TLD (`GET /v1/tlds/{tld}`), including pricing, restrictions, contact/nameserver requirements, and launch phases.
+Fetches the specification of a single TLD (`GET /v1/tlds/{tld}`), including registration/renewal periods, grace periods, contact/nameserver requirements, local presence rules, and launch phases. Pricing is not part of the TLD specification.
 
 ```hcl
 data "opusdns_tld" "com" {

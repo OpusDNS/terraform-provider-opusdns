@@ -9,7 +9,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	"github.com/opusdns/opusdns-go-client/models"
 	"github.com/opusdns/opusdns-go-client/opusdns"
 )
 
@@ -132,37 +131,16 @@ func (d *TLDsDataSource) Read(ctx context.Context, req datasource.ReadRequest, r
 		return
 	}
 
-	opts := &models.ListTLDsOptions{}
-	if v := data.Search.ValueString(); v != "" {
-		opts.Search = v
-	}
-	if v := data.Type.ValueString(); v != "" {
-		opts.Type = models.TLDType(v)
-	}
-	if !data.Available.IsNull() && !data.Available.IsUnknown() {
-		b := data.Available.ValueBool()
-		opts.Available = &b
-	}
-	if !data.RegistrationEnabled.IsNull() && !data.RegistrationEnabled.IsUnknown() {
-		b := data.RegistrationEnabled.ValueBool()
-		opts.RegistrationEnabled = &b
-	}
-	if !data.DNSSECSupported.IsNull() && !data.DNSSECSupported.IsUnknown() {
-		b := data.DNSSECSupported.ValueBool()
-		opts.DNSSECSupported = &b
-	}
-
-	tlds, err := d.client.TLDs.ListTLDs(ctx, opts)
+	tlds, err := d.client.TLDs.ListTLDs(ctx, nil)
 	if err != nil {
 		resp.Diagnostics.AddError("Error listing TLDs", formatAPIError(err))
 		return
 	}
 
-	// Apply client-side filters as a defence-in-depth: empirically the
-	// upstream API ignores the `type`/`available`/`registration_enabled`/
-	// `dnssec_supported` query parameters and returns the full list
-	// regardless. Re-filter here so the data source's behaviour matches
-	// its documented schema even if the server changes.
+	// Apply the filters client-side: the list endpoint only filters by TLD
+	// name (the SDK no longer sends the `search`, `type`, `available`,
+	// `registration_enabled` and `dnssec_supported` parameters because the API
+	// ignored them).
 	filtered := tlds[:0]
 	for _, t := range tlds {
 		if search := strings.ToLower(data.Search.ValueString()); search != "" {

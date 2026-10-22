@@ -48,13 +48,10 @@ func TestValidateDomainConfig_TransferWithoutContactsOK(t *testing.T) {
 	}
 }
 
-func TestBuildDomainListQuery_StatusFilters(t *testing.T) {
-	renewal := models.RenewalModeRenew
+func TestBuildDomainListQuery_SharedFilters(t *testing.T) {
 	opts := &models.ListDomainsOptions{
-		Search:      "example",
-		TLD:         "com",
-		RenewalMode: &renewal,
-		Status:      models.DomainStatus("ok"),
+		Search: "example",
+		TLD:    "com",
 	}
 	q := buildDomainListQuery(opts)
 	if got := q.Get("search"); got != "example" {
@@ -62,12 +59,6 @@ func TestBuildDomainListQuery_StatusFilters(t *testing.T) {
 	}
 	if got := q.Get("tld"); got != "com" {
 		t.Errorf("tld = %q, want com", got)
-	}
-	if got := q.Get("renewal_mode"); got != "renew" {
-		t.Errorf("renewal_mode = %q, want renew", got)
-	}
-	if got := q.Get("status"); got != "ok" {
-		t.Errorf("status = %q, want ok", got)
 	}
 }
 

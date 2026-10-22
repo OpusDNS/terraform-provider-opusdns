@@ -97,7 +97,11 @@ func (d *UserDataSource) Read(ctx context.Context, req datasource.ReadRequest, r
 	var err error
 	switch {
 	case data.Me.ValueBool():
-		user, err = d.client.Users.GetCurrentUser(ctx)
+		var profile *models.UserProfile
+		profile, err = d.client.Users.GetCurrentUser(ctx)
+		if profile != nil {
+			user = &profile.User
+		}
 	case !data.UserID.IsNull() && !data.UserID.IsUnknown() && data.UserID.ValueString() != "":
 		user, err = d.client.Users.GetUser(ctx, models.UserID(data.UserID.ValueString()))
 	default:
@@ -124,7 +128,8 @@ func populateUserDataModel(data *UserDataSourceModel, u *models.User) {
 	data.LastName = types.StringValue(u.LastName)
 	data.Email = types.StringValue(u.Email)
 	data.Locale = types.StringValue(u.Locale)
-	data.Status = emptyStringAsNull(string(u.Status))
+	// The API no longer returns a user status (deprecated attribute, always null).
+	data.Status = types.StringNull()
 	data.OrganizationID = types.StringValue(string(u.OrganizationID))
 	data.Phone = stringPtrToValue(u.Phone)
 

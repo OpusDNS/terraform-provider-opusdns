@@ -19,6 +19,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Upgraded `opusdns-go-client` `v1.1.1` → `v1.3.0`** (OpusDNS API spec
+  1.147.0 → 1.243.0; see the
+  [v1.3.0 release notes](https://github.com/OpusDNS/opusdns-go-client/releases/tag/v1.3.0)).
+  The SDK now decodes the API's real response shapes, so several data-source
+  schemas changed (see below and **Removed**). The SDK also no longer resends
+  POST/PATCH/DELETE requests after a 5xx or dropped connection, and rejects
+  requests with an empty ID before sending them.
+- **`opusdns_tld`** is reshaped to the TLD specification the API returns:
+  - `idn_supported`, `dnssec_supported`, `min_domain_length`,
+    `max_domain_length`, `whois_server`, `rdap_server`, `nameserver_config`
+    (`min`/`max`) and `contact_config` are kept. `contact_config[*].required`
+    is now derived from `min > 0`.
+  - `min_registration_period` / `max_registration_period` are replaced by
+    `registration_periods` (list of `{value, unit}`); a new `renewal_periods`
+    list is added.
+  - `grace_period_days` / `redemption_period_days` are replaced by
+    `grace_period` / `redemption_period`, ISO 8601 duration strings
+    (e.g. `P30D`).
+  - `restrictions` is replaced by `local_presence` (`required`,
+    `eligible_countries`).
+  - `phases[*]`: `status` is replaced by `supported`, `requirements` by
+    `smd_required`; unset `start_date` / `end_date` / `allocation_method` are
+    now `null` instead of an empty string.
+- **`opusdns_domains_summary`** reads the new summary shape. The attributes are
+  unchanged; `expiring_within_30_days` / `expiring_within_90_days` are `null`
+  when the API reports no expiry counts, and `total_domains` includes
+  sub-organizations.
 - **Upgraded `opusdns-go-client` `v1.0.10` → `v1.1.1`.** This refreshes the SDK
   data models against the current OpusDNS API. As a result, several data-source
   schemas changed to match fields the API no longer returns (see **Removed**),
@@ -40,16 +67,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   them** (SDK `v1.1.1` model refresh). Configurations referencing these
   attributes must be updated:
   - `opusdns_contact` / `opusdns_contacts`: `verified`, `verified_on`
-    (the `verified` *filter* on `opusdns_contacts` is retained).
+    (the `verified` filter on `opusdns_contacts` was removed too, see below).
   - `opusdns_event` / `opusdns_events`: `organization_id`, `user_id`,
     `ip_address`, `user_agent`, `source`.
   - `opusdns_events`: the `created_after` / `created_before` request filters.
+- **Removed with the `opusdns-go-client` `v1.3.0` upgrade** (the current API no
+  longer returns or accepts them). Configurations referencing these must be
+  updated:
+  - `opusdns_contacts`: the `verified` filter. `opusdns_contact` /
+    `opusdns_contacts`: `updated_on`.
+  - `opusdns_domains`: the `status` and `renewal_mode` filters. The API has no
+    such query parameters, so they were ignored.
+  - `opusdns_tld`: `available`, `registration_enabled`, `transfer_enabled`,
+    `description`, `registry`, `pricing`, `restrictions`,
+    `min_registration_period`, `max_registration_period`,
+    `grace_period_days`, `redemption_period_days`,
+    `nameserver_config.glue_records_required`, `phases[*].status` and
+    `phases[*].requirements` (see **Changed** for the replacements).
+    There is no replacement for `pricing`: the TLD specification carries no
+    prices.
 
 ### Notes
 
+- `opusdns_user` (data source and resource) and `opusdns_users`: the already
+  deprecated `status` attribute stays in the schema and is always `null`; the
+  SDK no longer has a user status.
+- `opusdns_tlds` only fills `name`, `type` and `available` from the list
+  endpoint; its other attributes (`registration_enabled`, `transfer_enabled`,
+  `idn_supported`, `dnssec_supported`, `min_`/`max_registration_period`) are
+  zero values, as with the previous SDK. Use `opusdns_tld` for details.
 - The `opusdns_tld_portfolio` raw-HTTP workaround for the SDK's
-  `TLDs.GetPortfolio` schema mismatch is retained pending verification that the
-  `v1.1.1` `TLDPortfolio` model matches the bare-array API response.
+  `TLDs.GetPortfolio` schema mismatch is retained. SDK `v1.3.0` now returns
+  `[]models.TLDPortfolioEntry` for the bare-array response, so the workaround
+  can be dropped in a follow-up.
 
 ## [1.0.1] - 2026-05-21
 

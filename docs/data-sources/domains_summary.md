@@ -19,7 +19,7 @@ Returns aggregate counts for all domains owned by the caller's organization (`GE
 
 - `domains_by_status` (Map of Number) Map of domain status string → domain count.
 - `domains_by_tld` (Map of Number) Map of TLD name (without leading dot) → domain count.
-- `expiring_within_30_days` (Number) Count of domains expiring within the next 30 days.
-- `expiring_within_90_days` (Number) Count of domains expiring within the next 90 days.
+- `expiring_within_30_days` (Number) Count of domains expiring within the next 30 days. Null when the API reports no expiry counts.
+- `expiring_within_90_days` (Number) Count of domains expiring within the next 90 days. Null when the API reports no expiry counts.
 - `id` (String) Static identifier for this data source.
-- `total_domains` (Number) Total number of domains.
+- `total_domains` (Number) Total number of domains, including those of sub-organizations.
