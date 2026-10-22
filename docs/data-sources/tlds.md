@@ -2,12 +2,12 @@
 page_title: "opusdns_tlds Data Source - opusdns"
 subcategory: "Domains"
 description: |-
-  Lists all TLDs supported by the OpusDNS registry. Server-side filters can narrow the list by name substring, TLD type, availability, registration-enabled status, or DNSSEC support. Use the singular opusdns_tld data source for rich per-TLD details (pricing, restrictions, phases).
+  Lists all TLDs supported by the OpusDNS registry. Optional filters narrow the list by name substring, TLD type, availability, or DNSSEC support. Use the singular opusdns_tld data source for rich per-TLD details (contacts, local presence, phases).
 ---
 
 # opusdns_tlds (Data Source)
 
-Lists all TLDs supported by the OpusDNS registry. Server-side filters can narrow the list by name substring, TLD type, availability, registration-enabled status, or DNSSEC support. Use the singular `opusdns_tld` data source for rich per-TLD details (pricing, restrictions, phases).
+Lists all TLDs supported by the OpusDNS registry. Optional filters narrow the list by name substring, TLD type, availability, or DNSSEC support. Use the singular `opusdns_tld` data source for rich per-TLD details (contacts, local presence, phases).
 
 ## Example Usage
 
@@ -42,7 +42,7 @@ output "cctld_dnssec_names" {
 
 - `available` (Boolean) Optional filter: only return TLDs whose `available` flag matches.
 - `dnssec_supported` (Boolean) Optional filter: only return TLDs whose `dnssec_supported` flag matches.
-- `registration_enabled` (Boolean) Optional filter: only return TLDs whose `registration_enabled` flag matches.
+- `registration_enabled` (Boolean, Deprecated) Deprecated: the OpusDNS API has no registration-enabled flag, so this filter has no effect. Use `available`.
 - `search` (String) Optional case-insensitive substring filter on TLD name.
 - `type` (String) Optional filter on TLD type. One of `gTLD`, `ccTLD`, `newGTLD`, or `sponsoredGTLD`.
 
@@ -59,9 +59,9 @@ Read-Only:
 - `available` (Boolean) Whether the TLD is available for registration.
 - `dnssec_supported` (Boolean) Whether DNSSEC is supported.
 - `idn_supported` (Boolean) Whether internationalised domain names are supported.
-- `max_registration_period` (Number) Maximum registration period in years.
-- `min_registration_period` (Number) Minimum registration period in years.
+- `max_registration_period` (Number) Longest registration period in whole years. Null when the TLD offers no whole-year period.
+- `min_registration_period` (Number) Shortest registration period in whole years. Null when the TLD offers no whole-year period.
 - `name` (String) TLD name without leading dot (e.g. `com`).
-- `registration_enabled` (Boolean) Whether new registrations are accepted.
-- `transfer_enabled` (Boolean) Whether transfers are accepted.
+- `registration_enabled` (Boolean, Deprecated) Deprecated: always null. The OpusDNS API has no registration-enabled flag; use `available`.
+- `transfer_enabled` (Boolean, Deprecated) Deprecated: always null. The OpusDNS API has no transfer-enabled flag.
 - `type` (String) TLD type (`gTLD`, `ccTLD`, `newGTLD`, `sponsoredGTLD`).
