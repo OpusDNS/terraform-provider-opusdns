@@ -49,7 +49,7 @@ func (d *DomainsSummaryDataSource) Schema(_ context.Context, _ datasource.Schema
 			},
 			"total_domains": schema.Int64Attribute{
 				Computed:            true,
-				MarkdownDescription: "Total number of domains.",
+				MarkdownDescription: "Total number of domains, including those of sub-organizations.",
 			},
 			"domains_by_tld": schema.MapAttribute{
 				Computed:            true,
@@ -63,11 +63,11 @@ func (d *DomainsSummaryDataSource) Schema(_ context.Context, _ datasource.Schema
 			},
 			"expiring_within_30_days": schema.Int64Attribute{
 				Computed:            true,
-				MarkdownDescription: "Count of domains expiring within the next 30 days.",
+				MarkdownDescription: "Count of domains expiring within the next 30 days. Null when the API reports no expiry counts.",
 			},
 			"expiring_within_90_days": schema.Int64Attribute{
 				Computed:            true,
-				MarkdownDescription: "Count of domains expiring within the next 90 days.",
+				MarkdownDescription: "Count of domains expiring within the next 90 days. Null when the API reports no expiry counts.",
 			},
 		},
 	}
@@ -102,13 +102,23 @@ func (d *DomainsSummaryDataSource) Read(ctx context.Context, _ datasource.ReadRe
 		return
 	}
 
-	byTLD := make(map[string]int64, len(summary.DomainsByTLD))
-	for k, v := range summary.DomainsByTLD {
+	counts := summary.Domains
+	byTLD := make(map[string]int64, len(counts.ByTLD))
+	for k, v := range counts.ByTLD {
 		byTLD[k] = int64(v)
 	}
-	byStatus := make(map[string]int64, len(summary.DomainsByStatus))
-	for k, v := range summary.DomainsByStatus {
-		byStatus[k] = int64(v)
+	byStatus := make(map[string]int64, len(counts.ByStatus))
+	for k, v := range counts.ByStatus {
+		byStatus[string(k)] = int64(v)
+	}
+
+	// The API omits expiring_soon when it has no expiry counts; leave the
+	// expiry attributes null rather than reporting a misleading zero.
+	expiring30 := types.Int64Null()
+	expiring90 := types.Int64Null()
+	if counts.ExpiringSoon != nil {
+		expiring30 = types.Int64Value(int64(counts.ExpiringSoon.Next30Days))
+		expiring90 = types.Int64Value(int64(counts.ExpiringSoon.Next90Days))
 	}
 
 	byTLDValue, diags := types.MapValueFrom(ctx, types.Int64Type, byTLD)
@@ -124,11 +134,11 @@ func (d *DomainsSummaryDataSource) Read(ctx context.Context, _ datasource.ReadRe
 
 	data := DomainsSummaryDataSourceModel{
 		ID:                   types.StringValue("domains_summary"),
-		TotalDomains:         types.Int64Value(int64(summary.TotalDomains)),
+		TotalDomains:         types.Int64Value(int64(counts.TotalCount)),
 		DomainsByTLD:         byTLDValue,
 		DomainsByStatus:      byStatusValue,
-		ExpiringWithin30Days: types.Int64Value(int64(summary.ExpiringWithin30Days)),
-		ExpiringWithin90Days: types.Int64Value(int64(summary.ExpiringWithin90Days)),
+		ExpiringWithin30Days: expiring30,
+		ExpiringWithin90Days: expiring90,
 	}
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }

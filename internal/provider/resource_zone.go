@@ -169,27 +169,29 @@ func (r *ZoneResource) Create(ctx context.Context, req resource.CreateRequest, r
 	}
 
 	requestedName := data.Name.ValueString()
-	zone, err := r.client.DNS.CreateZone(ctx, createReq)
+	changes, err := r.client.DNS.CreateZone(ctx, createReq)
 	if err != nil {
 		resp.Diagnostics.AddError("Error creating DNS zone", formatAPIError(err))
 		return
 	}
 
-	// Defensive: if the API response omits the zone name, fall back to the
-	// name we requested. Without this guard, an empty name would be persisted
-	// to state and subsequent Read/Delete calls would issue malformed requests
-	// (e.g. DELETE /v1/dns/ -> 405 Method Not Allowed).
-	resolvedName := canonicalZoneName(zone.Name)
+	// Defensive: CreateZone answers with the changeset, not the zone. If the
+	// changeset omits the zone name, fall back to the name we requested.
+	// Without this guard, an empty name would be persisted to state and
+	// subsequent Read/Delete calls would issue malformed requests (e.g.
+	// DELETE /v1/dns/ -> 405 Method Not Allowed).
+	resolvedName := canonicalZoneName(changes.ZoneName)
 	if resolvedName == "" {
 		resolvedName = canonicalZoneName(requestedName)
-		tflog.Warn(ctx, "CreateZone response did not include a zone name; falling back to requested name", map[string]interface{}{
+		tflog.Warn(ctx, "CreateZone changeset did not include a zone name; falling back to requested name", map[string]interface{}{
 			"requested_name": requestedName,
 		})
 	}
 
-	// CreateZone's response omits zone_id, created_on, updated_on, and tags.
-	// Re-read with include=tags so all computed attributes are populated in
-	// state immediately after create (required for ImportStateVerify parity).
+	// CreateZone returns only the changeset (no zone_id, created_on,
+	// updated_on or tags). Read the zone back with include=tags so all
+	// computed attributes are populated in state immediately after create
+	// (required for ImportStateVerify parity).
 	fullZone, err := r.client.DNS.GetZoneWithOptions(ctx, resolvedName, &models.GetZoneOptions{Include: []models.ZoneIncludeField{models.ZoneIncludeTags}})
 	if err != nil {
 		resp.Diagnostics.AddError("Error reading DNS zone after create", formatAPIError(err))

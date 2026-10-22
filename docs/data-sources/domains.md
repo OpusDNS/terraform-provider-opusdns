@@ -15,11 +15,10 @@ Lists domains within the authenticated caller's organization (`GET /v1/domains`)
 # List all domains in the caller's organization.
 data "opusdns_domains" "all" {}
 
-# Filter server-side: .com domains with the transfer lock on, set to auto-renew.
+# Filter server-side: .com domains with the transfer lock on.
 data "opusdns_domains" "locked_com" {
   tld           = "com"
   transfer_lock = true
-  renewal_mode  = "renew"
 }
 
 output "domain_names" {
@@ -45,10 +44,8 @@ output "domain_names" {
 - `registered_after` (String) Filter domains registered after this RFC3339 timestamp.
 - `registered_before` (String) Filter domains registered before this RFC3339 timestamp.
 - `registry_statuses_in` (List of String) Filter by registry statuses. Multiple values are sent as repeated API parameters.
-- `renewal_mode` (String) Filter by renewal mode (`renew` or `expire`).
 - `search` (String) Free-text search over domain names.
 - `sld` (String) Filter by second-level domain.
-- `status` (String) Filter by domain lifecycle status (e.g. `ok`, `pendingTransfer`).
 - `status_tag_mode` (String) How to combine `status_tags`: `match_any` (default) matches domains with at least one of the tags; `match_all` matches domains with every tag.
 - `status_tags` (List of String) Filter by system-managed status tag types (e.g. `VERIFICATION_REQUIRED`). Multiple values are sent as repeated `status_tags` query parameters. When set, each domain's computed `status_tags` is also populated.
 - `tag_ids` (List of String) Filter by tag IDs. Multiple values are sent as repeated `tag_ids` query parameters.

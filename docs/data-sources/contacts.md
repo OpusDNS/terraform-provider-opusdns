@@ -15,15 +15,14 @@ Lists contacts within the authenticated caller's organization (`GET /v1/contacts
 # List all contacts in the caller's organization.
 data "opusdns_contacts" "all" {}
 
-# Filter server-side: only verified US contacts whose last name is "Smith".
-data "opusdns_contacts" "verified_us_smiths" {
+# Filter server-side: only US contacts whose last name is "Smith".
+data "opusdns_contacts" "us_smiths" {
   country   = "US"
   last_name = "Smith"
-  verified  = true
 }
 
 output "contact_emails" {
-  value = [for c in data.opusdns_contacts.contact_list.contacts : c.email]
+  value = [for c in data.opusdns_contacts.us_smiths.contacts : c.email]
 }
 ```
 
@@ -41,7 +40,6 @@ output "contact_emails" {
 - `search` (String) Free-text search over contacts.
 - `tag_ids` (List of String) Filter by tag IDs. Multiple values are sent as repeated `tag_ids` query parameters.
 - `tag_mode` (String) Tag filter mode. Use `match_any` or `match_all` according to the API.
-- `verified` (Boolean) Filter by verification status.
 
 ### Read-Only
 
@@ -69,4 +67,3 @@ Read-Only:
 - `state` (String)
 - `street` (String)
 - `title` (String)
-- `updated_on` (String)

@@ -317,8 +317,8 @@ func TestBuildDomainTransferRequest(t *testing.T) {
 	if req.RenewalMode != models.RenewalMode("renew") {
 		t.Errorf("RenewalMode = %q, want renew", req.RenewalMode)
 	}
-	if req.Period != 2 {
-		t.Errorf("Period = %d, want 2", req.Period)
+	if req.Period == nil || req.Period.Value != 2 || req.Period.Unit != models.PeriodUnitYear {
+		t.Errorf("Period = %+v, want 2y", req.Period)
 	}
 	if len(req.Contacts) != 1 || len(req.Contacts[models.DomainContactType("registrant")]) != 1 {
 		t.Errorf("Contacts not mapped through: %#v", req.Contacts)

@@ -109,7 +109,7 @@ func (d *UsersDataSource) Read(ctx context.Context, req datasource.ReadRequest, 
 			"first_name":      types.StringValue(u.FirstName),
 			"last_name":       types.StringValue(u.LastName),
 			"email":           types.StringValue(u.Email),
-			"status":          emptyStringAsNull(string(u.Status)),
+			"status":          types.StringNull(),
 			"organization_id": types.StringValue(string(u.OrganizationID)),
 		})
 		resp.Diagnostics.Append(diags...)

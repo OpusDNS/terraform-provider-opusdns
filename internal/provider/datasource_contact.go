@@ -42,7 +42,6 @@ type ContactDataSourceModel struct {
 	Country        types.String `tfsdk:"country"`
 	Disclose       types.Bool   `tfsdk:"disclose"`
 	CreatedOn      types.String `tfsdk:"created_on"`
-	UpdatedOn      types.String `tfsdk:"updated_on"`
 }
 
 // NewContactDataSource returns a new ContactDataSource.
@@ -75,7 +74,6 @@ func (d *ContactDataSource) Schema(_ context.Context, _ datasource.SchemaRequest
 			"country":         schema.StringAttribute{Computed: true, MarkdownDescription: "ISO 3166-1 alpha-2 country code."},
 			"disclose":        schema.BoolAttribute{Computed: true, MarkdownDescription: "Whether the contact is publicly disclosed (WHOIS)."},
 			"created_on":      schema.StringAttribute{Computed: true, MarkdownDescription: "RFC3339 timestamp when the contact was created."},
-			"updated_on":      schema.StringAttribute{Computed: true, MarkdownDescription: "RFC3339 timestamp when the contact was last updated."},
 		},
 	}
 }
@@ -133,5 +131,4 @@ func populateContactDataSourceModel(data *ContactDataSourceModel, c *models.Cont
 	data.Disclose = types.BoolValue(c.Disclose)
 
 	data.CreatedOn = timePtrToValue(c.CreatedOn)
-	data.UpdatedOn = timePtrToValue(c.UpdatedOn)
 }

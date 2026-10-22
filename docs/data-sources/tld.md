@@ -2,27 +2,27 @@
 page_title: "opusdns_tld Data Source - opusdns"
 subcategory: "Domains"
 description: |-
-  Fetches detailed information for a single TLD via GET /v1/tlds/{tld}, including pricing, registration restrictions, nameserver/contact requirements, and launch phases.
+  Fetches the specification of a single TLD via GET /v1/tlds/{tld}, including registration and renewal periods, grace periods, nameserver and contact requirements, local presence rules and launch phases. Pricing is not part of the TLD specification and is not exposed by this data source.
 ---
 
 # opusdns_tld (Data Source)
 
-Fetches detailed information for a single TLD via `GET /v1/tlds/{tld}`, including pricing, registration restrictions, nameserver/contact requirements, and launch phases.
+Fetches the specification of a single TLD via `GET /v1/tlds/{tld}`, including registration and renewal periods, grace periods, nameserver and contact requirements, local presence rules and launch phases. Pricing is not part of the TLD specification and is not exposed by this data source.
 
 ## Example Usage
 
 ```terraform
-# Fetch detailed information for a single TLD.
+# Fetch the specification of a single TLD.
 data "opusdns_tld" "com" {
   name = "com"
 }
 
-output "com_register_price" {
-  value = data.opusdns_tld.com.pricing.register_price
-}
-
 output "com_dnssec_supported" {
   value = data.opusdns_tld.com.dnssec_supported
+}
+
+output "com_registration_periods" {
+  value = [for p in data.opusdns_tld.com.registration_periods : "${p.value}${p.unit}"]
 }
 
 output "com_contact_roles" {
@@ -39,28 +39,22 @@ output "com_contact_roles" {
 
 ### Read-Only
 
-- `available` (Boolean) Whether the TLD is available for registration.
-- `contact_config` (Attributes List) Per-contact-role requirements for registration. (see [below for nested schema](#nestedatt--contact_config))
-- `description` (String) Human-readable description of the TLD.
-- `dnssec_supported` (Boolean) Whether DNSSEC is supported.
-- `grace_period_days` (Number) Days in the grace period after expiration.
+- `contact_config` (Attributes List) Per-contact-role requirements for registration. Empty when the specification defines none. (see [below for nested schema](#nestedatt--contact_config))
+- `dnssec_supported` (Boolean) Whether DNSSEC can be enabled.
+- `grace_period` (String) Grace period after expiration as an ISO 8601 duration (e.g. `P30D`). Null when the TLD has none.
 - `id` (String) The TLD name (used as the unique identifier).
 - `idn_supported` (Boolean) Whether internationalised domain names are supported.
+- `local_presence` (Attributes) Local presence requirements of the TLD. Null when the specification defines none. (see [below for nested schema](#nestedatt--local_presence))
 - `max_domain_length` (Number) Maximum SLD length permitted.
-- `max_registration_period` (Number) Maximum registration period in years.
 - `min_domain_length` (Number) Minimum SLD length permitted.
-- `min_registration_period` (Number) Minimum registration period in years.
 - `nameserver_config` (Attributes) Nameserver requirements for the TLD. (see [below for nested schema](#nestedatt--nameserver_config))
-- `phases` (Attributes List) Launch phases for the TLD (e.g. sunrise, landrush, general availability). (see [below for nested schema](#nestedatt--phases))
-- `pricing` (Attributes) Pricing information for the TLD. (see [below for nested schema](#nestedatt--pricing))
-- `rdap_server` (String) RDAP server URL for the TLD.
-- `redemption_period_days` (Number) Days in the redemption period.
-- `registration_enabled` (Boolean) Whether new registrations are accepted.
-- `registry` (String) Name of the registry operator.
-- `restrictions` (Attributes) Registration restrictions for the TLD. (see [below for nested schema](#nestedatt--restrictions))
-- `transfer_enabled` (Boolean) Whether transfers are accepted.
-- `type` (String) TLD type (`gTLD`, `ccTLD`, `newGTLD`, `sponsoredGTLD`).
-- `whois_server` (String) WHOIS server hostname for the TLD.
+- `phases` (Attributes List) Launch phases before general availability (e.g. sunrise, landrush). Empty when the specification defines none. (see [below for nested schema](#nestedatt--phases))
+- `rdap_server` (String) RDAP server URL for the TLD. Null when the registry has none.
+- `redemption_period` (String) Redemption period as an ISO 8601 duration (e.g. `P30D`). Null when the TLD has none.
+- `registration_periods` (Attributes List) Periods a domain can be registered for. (see [below for nested schema](#nestedatt--registration_periods))
+- `renewal_periods` (Attributes List) Periods a domain can be renewed for. (see [below for nested schema](#nestedatt--renewal_periods))
+- `type` (String) TLD type (`gTLD` or `ccTLD`). Null when the specification does not state it.
+- `whois_server` (String) WHOIS server hostname for the TLD. Null when the registry has none.
 
 <a id="nestedatt--contact_config"></a>
 ### Nested Schema for `contact_config`
@@ -69,8 +63,17 @@ Read-Only:
 
 - `max` (Number) Maximum number of contacts of this type.
 - `min` (Number) Minimum number of contacts of this type.
-- `required` (Boolean) Whether this contact type is required.
+- `required` (Boolean) Whether this contact type is required (`min` is greater than zero).
 - `type` (String) Contact role (`registrant`, `admin`, `tech`, `billing`).
+
+
+<a id="nestedatt--local_presence"></a>
+### Nested Schema for `local_presence`
+
+Read-Only:
+
+- `eligible_countries` (List of String) Countries that satisfy the requirement.
+- `required` (Boolean) Whether a local presence is required.
 
 
 <a id="nestedatt--nameserver_config"></a>
@@ -78,7 +81,6 @@ Read-Only:
 
 Read-Only:
 
-- `glue_records_required` (Boolean) Whether glue records are required.
 - `max` (Number) Maximum number of nameservers allowed.
 - `min` (Number) Minimum number of nameservers required.
 
@@ -88,36 +90,27 @@ Read-Only:
 
 Read-Only:
 
-- `allocation_method` (String) How domains are allocated during this phase (`fcfs`, `auction`, `lottery`).
-- `end_date` (String) RFC3339 timestamp when the phase ends (empty if unset).
-- `name` (String)
-- `requirements` (String) Special requirements for this phase.
-- `start_date` (String) RFC3339 timestamp when the phase starts (empty if unset).
-- `status` (String)
+- `allocation_method` (String) How domains are allocated during this phase (`fcfs`, `auction`, `lottery`). Null if unset.
+- `end_date` (String) RFC3339 timestamp when the phase ends (null if unset).
+- `name` (String) Phase type (`sunrise`, `landrush`, `eap`).
+- `smd_required` (Boolean) Whether a signed mark data (SMD) file is required. Null if unset.
+- `start_date` (String) RFC3339 timestamp when the phase starts (null if unset).
+- `supported` (Boolean) Whether OpusDNS supports the phase.
 
 
-<a id="nestedatt--pricing"></a>
-### Nested Schema for `pricing`
-
-Read-Only:
-
-- `currency` (String)
-- `premium_pricing` (Boolean)
-- `register_price` (String)
-- `renew_price` (String)
-- `restore_price` (String)
-- `transfer_price` (String)
-
-
-<a id="nestedatt--restrictions"></a>
-### Nested Schema for `restrictions`
+<a id="nestedatt--registration_periods"></a>
+### Nested Schema for `registration_periods`
 
 Read-Only:
 
-- `allowed_countries` (List of String)
-- `local_presence_required` (Boolean)
-- `notes` (String)
-- `registrant_types` (List of String)
-- `requires_verification` (Boolean)
-- `restricted_countries` (List of String)
-- `trademark_required` (Boolean)
+- `unit` (String) Period unit: `y` (years), `m` (months) or `d` (days).
+- `value` (Number) Length of the period in `unit`.
+
+
+<a id="nestedatt--renewal_periods"></a>
+### Nested Schema for `renewal_periods`
+
+Read-Only:
+
+- `unit` (String) Period unit: `y` (years), `m` (months) or `d` (days).
+- `value` (Number) Length of the period in `unit`.

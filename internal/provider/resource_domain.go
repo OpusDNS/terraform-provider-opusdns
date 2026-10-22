@@ -614,9 +614,9 @@ func validateDomainConfig(data DomainResourceModel) diag.Diagnostics {
 }
 
 // buildDomainTransferRequest assembles a DomainTransferRequest from the resource
-// model and the already-converted contacts/nameservers. Period is sent as a bare
-// year count (the transfer API has no period unit). Callers must validate the
-// model with validateDomainConfig first.
+// model and the already-converted contacts/nameservers. Period is sent as a
+// whole number of years (validateDomainConfig enforces period_unit = "y" for
+// transfers). Callers must validate the model with validateDomainConfig first.
 func buildDomainTransferRequest(
 	data DomainResourceModel,
 	contacts map[models.DomainContactType][]models.ContactHandle,
@@ -628,7 +628,10 @@ func buildDomainTransferRequest(
 		Contacts:    contacts,
 		RenewalMode: models.RenewalMode(data.RenewalMode.ValueString()),
 		Nameservers: nameservers,
-		Period:      int(data.PeriodValue.ValueInt64()),
+		Period: &models.DomainPeriod{
+			Value: int(data.PeriodValue.ValueInt64()),
+			Unit:  models.PeriodUnitYear,
+		},
 	}
 }
 

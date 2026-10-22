@@ -280,7 +280,7 @@ func populateUserModel(data *UserResourceModel, u *models.User) {
 	data.LastName = types.StringValue(u.LastName)
 	data.Email = types.StringValue(u.Email)
 	data.Locale = types.StringValue(u.Locale)
-	data.Status = emptyStringAsNull(string(u.Status))
+	data.Status = types.StringNull()
 	data.OrganizationID = types.StringValue(string(u.OrganizationID))
 
 	data.Phone = normalizedPhoneValue(u.Phone)

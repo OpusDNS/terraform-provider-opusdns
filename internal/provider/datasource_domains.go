@@ -31,8 +31,6 @@ type DomainsDataSourceModel struct {
 	Name               types.String `tfsdk:"name"`
 	TLD                types.String `tfsdk:"tld"`
 	SLD                types.String `tfsdk:"sld"`
-	Status             types.String `tfsdk:"status"`
-	RenewalMode        types.String `tfsdk:"renewal_mode"`
 	TransferLock       types.Bool   `tfsdk:"transfer_lock"`
 	IsPremium          types.Bool   `tfsdk:"is_premium"`
 	TagIDs             types.List   `tfsdk:"tag_ids"`
@@ -98,8 +96,6 @@ func (d *DomainsDataSource) Schema(_ context.Context, _ datasource.SchemaRequest
 			"name":          schema.StringAttribute{Optional: true, MarkdownDescription: "Filter by exact fully-qualified domain name."},
 			"tld":           schema.StringAttribute{Optional: true, MarkdownDescription: "Filter by top-level domain."},
 			"sld":           schema.StringAttribute{Optional: true, MarkdownDescription: "Filter by second-level domain."},
-			"status":        schema.StringAttribute{Optional: true, MarkdownDescription: "Filter by domain lifecycle status (e.g. `ok`, `pendingTransfer`)."},
-			"renewal_mode":  schema.StringAttribute{Optional: true, MarkdownDescription: "Filter by renewal mode (`renew` or `expire`)."},
 			"transfer_lock": schema.BoolAttribute{Optional: true, MarkdownDescription: "Filter by transfer-lock status."},
 			"is_premium":    schema.BoolAttribute{Optional: true, MarkdownDescription: "Filter by premium classification."},
 			"tag_ids": schema.ListAttribute{
@@ -222,13 +218,6 @@ func (d *DomainsDataSource) Read(ctx context.Context, req datasource.ReadRequest
 		Name:   stringValue(data.Name),
 		TLD:    stringValue(data.TLD),
 		SLD:    stringValue(data.SLD),
-	}
-	if !data.Status.IsNull() && !data.Status.IsUnknown() {
-		opts.Status = models.DomainStatus(data.Status.ValueString())
-	}
-	if !data.RenewalMode.IsNull() && !data.RenewalMode.IsUnknown() {
-		mode := models.RenewalMode(data.RenewalMode.ValueString())
-		opts.RenewalMode = &mode
 	}
 	if !data.TransferLock.IsNull() && !data.TransferLock.IsUnknown() {
 		v := data.TransferLock.ValueBool()
