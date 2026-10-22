@@ -19,6 +19,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Upgraded `opusdns-go-client` `v1.3.0` → `v1.3.1`**, whose `ListTLDs`
+  reads the full TLD specification the list endpoint sends (see **Fixed**).
 - **Upgraded `opusdns-go-client` `v1.1.1` → `v1.3.0`** (OpusDNS API spec
   1.147.0 → 1.243.0; see the
   [v1.3.0 release notes](https://github.com/OpusDNS/opusdns-go-client/releases/tag/v1.3.0)).
@@ -61,6 +63,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Rewrote `RELEASING.md` to document the HCP Terraform Registry workflow.
 - Corrected the license metadata in `README.md`.
 
+### Deprecated
+
+- **`opusdns_tlds`**: the `registration_enabled` filter and the
+  `tlds[*].registration_enabled` / `tlds[*].transfer_enabled` attributes. The
+  OpusDNS API has no such flags. The filter is ignored with a warning (it used
+  to match nothing when set to `true`), and the attributes are always `null`.
+  Use `available` instead of `registration_enabled`.
+
 ### Removed
 
 - **Fields dropped from data sources because the current API no longer returns
@@ -87,15 +97,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     There is no replacement for `pricing`: the TLD specification carries no
     prices.
 
+### Fixed
+
+- **`opusdns_tlds`** now fills `idn_supported`, `dnssec_supported` and
+  `min_`/`max_registration_period` from the TLD specification. Before, they
+  were always `false`/`0`, so `dnssec_supported = true` returned no TLDs.
+  `min_`/`max_registration_period` count only whole-year periods and are
+  `null` when a TLD offers none.
+
 ### Notes
 
 - `opusdns_user` (data source and resource) and `opusdns_users`: the already
   deprecated `status` attribute stays in the schema and is always `null`; the
   SDK no longer has a user status.
-- `opusdns_tlds` only fills `name`, `type` and `available` from the list
-  endpoint; its other attributes (`registration_enabled`, `transfer_enabled`,
-  `idn_supported`, `dnssec_supported`, `min_`/`max_registration_period`) are
-  zero values, as with the previous SDK. Use `opusdns_tld` for details.
 - The `opusdns_tld_portfolio` raw-HTTP workaround for the SDK's
   `TLDs.GetPortfolio` schema mismatch is retained. SDK `v1.3.0` now returns
   `[]models.TLDPortfolioEntry` for the bare-array response, so the workaround

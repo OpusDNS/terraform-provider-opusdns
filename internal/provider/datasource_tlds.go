@@ -8,7 +8,9 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/opusdns/opusdns-go-client/models"
 	"github.com/opusdns/opusdns-go-client/opusdns"
 )
 
@@ -34,7 +36,7 @@ type TLDsDataSourceModel struct {
 // tldItemAttrTypes is the shape of each entry in the `tlds` list.
 //
 // We surface only the flat scalar fields here. Rich nested data
-// (pricing, restrictions, contact_config, phases) is available via the
+// (contact_config, local_presence, phases) is available via the
 // single `opusdns_tld` data source.
 var tldItemAttrTypes = map[string]attr.Type{
 	"name":                    types.StringType,
@@ -59,10 +61,10 @@ func (d *TLDsDataSource) Metadata(_ context.Context, req datasource.MetadataRequ
 
 func (d *TLDsDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		MarkdownDescription: "Lists all TLDs supported by the OpusDNS registry. Server-side filters " +
-			"can narrow the list by name substring, TLD type, availability, " +
-			"registration-enabled status, or DNSSEC support. Use the singular " +
-			"`opusdns_tld` data source for rich per-TLD details (pricing, restrictions, phases).",
+		MarkdownDescription: "Lists all TLDs supported by the OpusDNS registry. Optional filters " +
+			"narrow the list by name substring, TLD type, availability, or DNSSEC " +
+			"support. Use the singular `opusdns_tld` data source for rich per-TLD " +
+			"details (contacts, local presence, phases).",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Computed:            true,
@@ -82,7 +84,8 @@ func (d *TLDsDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, r
 			},
 			"registration_enabled": schema.BoolAttribute{
 				Optional:            true,
-				MarkdownDescription: "Optional filter: only return TLDs whose `registration_enabled` flag matches.",
+				MarkdownDescription: "Deprecated: the OpusDNS API has no registration-enabled flag, so this filter has no effect. Use `available`.",
+				DeprecationMessage:  tldRegistrationEnabledDeprecation,
 			},
 			"dnssec_supported": schema.BoolAttribute{
 				Optional:            true,
@@ -93,15 +96,23 @@ func (d *TLDsDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, r
 				MarkdownDescription: "The list of TLDs matching the supplied filters.",
 				NestedObject: schema.NestedAttributeObject{
 					Attributes: map[string]schema.Attribute{
-						"name":                    schema.StringAttribute{Computed: true, MarkdownDescription: "TLD name without leading dot (e.g. `com`)."},
-						"type":                    schema.StringAttribute{Computed: true, MarkdownDescription: "TLD type (`gTLD`, `ccTLD`, `newGTLD`, `sponsoredGTLD`)."},
-						"available":               schema.BoolAttribute{Computed: true, MarkdownDescription: "Whether the TLD is available for registration."},
-						"registration_enabled":    schema.BoolAttribute{Computed: true, MarkdownDescription: "Whether new registrations are accepted."},
-						"transfer_enabled":        schema.BoolAttribute{Computed: true, MarkdownDescription: "Whether transfers are accepted."},
+						"name":      schema.StringAttribute{Computed: true, MarkdownDescription: "TLD name without leading dot (e.g. `com`)."},
+						"type":      schema.StringAttribute{Computed: true, MarkdownDescription: "TLD type (`gTLD`, `ccTLD`, `newGTLD`, `sponsoredGTLD`)."},
+						"available": schema.BoolAttribute{Computed: true, MarkdownDescription: "Whether the TLD is available for registration."},
+						"registration_enabled": schema.BoolAttribute{
+							Computed:            true,
+							MarkdownDescription: "Deprecated: always null. The OpusDNS API has no registration-enabled flag; use `available`.",
+							DeprecationMessage:  tldRegistrationEnabledDeprecation,
+						},
+						"transfer_enabled": schema.BoolAttribute{
+							Computed:            true,
+							MarkdownDescription: "Deprecated: always null. The OpusDNS API has no transfer-enabled flag.",
+							DeprecationMessage:  "The OpusDNS API has no transfer-enabled flag; this attribute is always null and will be removed in a future release.",
+						},
 						"idn_supported":           schema.BoolAttribute{Computed: true, MarkdownDescription: "Whether internationalised domain names are supported."},
 						"dnssec_supported":        schema.BoolAttribute{Computed: true, MarkdownDescription: "Whether DNSSEC is supported."},
-						"min_registration_period": schema.Int64Attribute{Computed: true, MarkdownDescription: "Minimum registration period in years."},
-						"max_registration_period": schema.Int64Attribute{Computed: true, MarkdownDescription: "Maximum registration period in years."},
+						"min_registration_period": schema.Int64Attribute{Computed: true, MarkdownDescription: "Shortest registration period in whole years. Null when the TLD offers no whole-year period."},
+						"max_registration_period": schema.Int64Attribute{Computed: true, MarkdownDescription: "Longest registration period in whole years. Null when the TLD offers no whole-year period."},
 					},
 				},
 			},
@@ -137,40 +148,11 @@ func (d *TLDsDataSource) Read(ctx context.Context, req datasource.ReadRequest, r
 		return
 	}
 
-	// Apply the filters client-side: the list endpoint only filters by TLD
-	// name (the SDK no longer sends the `search`, `type`, `available`,
-	// `registration_enabled` and `dnssec_supported` parameters because the API
-	// ignored them).
-	filtered := tlds[:0]
-	for _, t := range tlds {
-		if search := strings.ToLower(data.Search.ValueString()); search != "" {
-			if !strings.Contains(strings.ToLower(t.Name), search) {
-				continue
-			}
-		}
-		if v := data.Type.ValueString(); v != "" {
-			if string(t.Type) != v {
-				continue
-			}
-		}
-		if !data.Available.IsNull() && !data.Available.IsUnknown() {
-			if t.Available != data.Available.ValueBool() {
-				continue
-			}
-		}
-		if !data.RegistrationEnabled.IsNull() && !data.RegistrationEnabled.IsUnknown() {
-			if t.RegistrationEnabled != data.RegistrationEnabled.ValueBool() {
-				continue
-			}
-		}
-		if !data.DNSSECSupported.IsNull() && !data.DNSSECSupported.IsUnknown() {
-			if t.DNSSECSupported != data.DNSSECSupported.ValueBool() {
-				continue
-			}
-		}
-		filtered = append(filtered, t)
+	if !data.RegistrationEnabled.IsNull() && !data.RegistrationEnabled.IsUnknown() {
+		resp.Diagnostics.AddAttributeWarning(path.Root("registration_enabled"),
+			"Filter has no effect", tldRegistrationEnabledDeprecation)
 	}
-	tlds = filtered
+	tlds = filterTLDs(tlds, data)
 
 	objType := types.ObjectType{AttrTypes: tldItemAttrTypes}
 	values := make([]attr.Value, len(tlds))
@@ -179,12 +161,12 @@ func (d *TLDsDataSource) Read(ctx context.Context, req datasource.ReadRequest, r
 			"name":                    types.StringValue(t.Name),
 			"type":                    types.StringValue(string(t.Type)),
 			"available":               types.BoolValue(t.Available),
-			"registration_enabled":    types.BoolValue(t.RegistrationEnabled),
-			"transfer_enabled":        types.BoolValue(t.TransferEnabled),
+			"registration_enabled":    types.BoolNull(),
+			"transfer_enabled":        types.BoolNull(),
 			"idn_supported":           types.BoolValue(t.IDNSupported),
 			"dnssec_supported":        types.BoolValue(t.DNSSECSupported),
-			"min_registration_period": types.Int64Value(int64(t.MinRegistrationPeriod)),
-			"max_registration_period": types.Int64Value(int64(t.MaxRegistrationPeriod)),
+			"min_registration_period": registrationYearsValue(t.MinRegistrationPeriod),
+			"max_registration_period": registrationYearsValue(t.MaxRegistrationPeriod),
 		})
 		resp.Diagnostics.Append(diags...)
 		if resp.Diagnostics.HasError() {
@@ -202,4 +184,46 @@ func (d *TLDsDataSource) Read(ctx context.Context, req datasource.ReadRequest, r
 	data.ID = types.StringValue("tlds")
 	data.TLDs = list
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
+}
+
+const tldRegistrationEnabledDeprecation = "The OpusDNS API has no registration-enabled flag, so this has no effect and will be removed in a future release. Use `available`."
+
+// filterTLDs applies the data source's filters client-side: the list endpoint
+// only filters by TLD name. The deprecated `registration_enabled` filter is
+// ignored, because the API has no such flag.
+func filterTLDs(tlds []models.TLD, data TLDsDataSourceModel) []models.TLD {
+	filtered := make([]models.TLD, 0, len(tlds))
+	for _, t := range tlds {
+		if search := strings.ToLower(data.Search.ValueString()); search != "" {
+			if !strings.Contains(strings.ToLower(t.Name), search) {
+				continue
+			}
+		}
+		if v := data.Type.ValueString(); v != "" {
+			if string(t.Type) != v {
+				continue
+			}
+		}
+		if !data.Available.IsNull() && !data.Available.IsUnknown() {
+			if t.Available != data.Available.ValueBool() {
+				continue
+			}
+		}
+		if !data.DNSSECSupported.IsNull() && !data.DNSSECSupported.IsUnknown() {
+			if t.DNSSECSupported != data.DNSSECSupported.ValueBool() {
+				continue
+			}
+		}
+		filtered = append(filtered, t)
+	}
+	return filtered
+}
+
+// registrationYearsValue maps the SDK's period in whole years to state; 0
+// means the TLD offers no whole-year period.
+func registrationYearsValue(years int) types.Int64 {
+	if years == 0 {
+		return types.Int64Null()
+	}
+	return types.Int64Value(int64(years))
 }
