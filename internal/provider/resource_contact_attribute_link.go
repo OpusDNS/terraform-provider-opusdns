@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"strings"
-	"time"
 
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
@@ -12,6 +11,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/opusdns/opusdns-go-client/models"
 	"github.com/opusdns/opusdns-go-client/opusdns"
 )
 
@@ -115,18 +115,18 @@ func (r *ContactAttributeLinkResource) Create(ctx context.Context, req resource.
 		return
 	}
 
-	link, err := rawLinkContactToAttributeSet(ctx, r.client, data.ContactID.ValueString(), data.ContactAttributeSetID.ValueString())
+	link, err := r.client.Contacts.LinkContactAttributeSet(ctx, models.ContactID(data.ContactID.ValueString()), models.ContactAttributeSetID(data.ContactAttributeSetID.ValueString()))
 	if err != nil {
 		resp.Diagnostics.AddError("Error linking contact to attribute set", formatAPIError(err))
 		return
 	}
 
-	data.ID = types.StringValue(link.ContactAttributeLinkID)
-	data.ContactAttributeLinkID = types.StringValue(link.ContactAttributeLinkID)
-	data.ContactID = types.StringValue(link.ContactID)
-	data.ContactAttributeSetID = types.StringValue(link.ContactAttributeSetID)
+	data.ID = types.StringValue(string(link.ContactAttributeLinkID))
+	data.ContactAttributeLinkID = types.StringValue(string(link.ContactAttributeLinkID))
+	data.ContactID = types.StringValue(string(link.ContactID))
+	data.ContactAttributeSetID = types.StringValue(string(link.ContactAttributeSetID))
 	data.TLD = types.StringValue(link.TLD)
-	data.CreatedOn = types.StringValue(link.CreatedOn.Format(time.RFC3339))
+	data.CreatedOn = types.StringValue(formatContactTimestamp(link.CreatedOn))
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
@@ -147,7 +147,7 @@ func (r *ContactAttributeLinkResource) Read(ctx context.Context, req resource.Re
 
 	// No dedicated GET-link endpoint exists. The link is observable via the
 	// contact's `attribute_sets` array; find ours by attribute_set id.
-	links, err := rawGetContactAttributeLinks(ctx, r.client, contactID)
+	contact, err := r.client.Contacts.GetContact(ctx, models.ContactID(contactID))
 	if err != nil {
 		if isNotFound(err) {
 			resp.State.RemoveResource(ctx)
@@ -157,8 +157,8 @@ func (r *ContactAttributeLinkResource) Read(ctx context.Context, req resource.Re
 		return
 	}
 
-	for _, l := range links {
-		if l.ContactAttributeSetID == setID {
+	for _, l := range contact.AttributeSets {
+		if string(l.ContactAttributeSetID) == setID {
 			data.TLD = types.StringValue(l.TLD)
 			resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 			return

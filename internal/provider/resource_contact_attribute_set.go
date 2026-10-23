@@ -3,7 +3,6 @@ package provider
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
@@ -15,6 +14,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/opusdns/opusdns-go-client/models"
 	"github.com/opusdns/opusdns-go-client/opusdns"
 )
 
@@ -147,13 +147,11 @@ func (r *ContactAttributeSetResource) Create(ctx context.Context, req resource.C
 		return
 	}
 
-	body := map[string]interface{}{
-		"label":      data.Label.ValueString(),
-		"tld":        data.TLD.ValueString(),
-		"attributes": attrs,
-	}
-
-	set, err := rawCreateContactAttributeSet(ctx, r.client, body)
+	set, err := r.client.Contacts.CreateContactAttributeSet(ctx, &models.ContactAttributeSetCreateRequest{
+		Label:      data.Label.ValueString(),
+		TLD:        data.TLD.ValueString(),
+		Attributes: attrs,
+	})
 	if err != nil {
 		resp.Diagnostics.AddError("Error creating contact attribute set", formatAPIError(err))
 		return
@@ -179,7 +177,7 @@ func (r *ContactAttributeSetResource) Read(ctx context.Context, req resource.Rea
 		return
 	}
 
-	set, err := rawGetContactAttributeSet(ctx, r.client, id)
+	set, err := r.client.Contacts.GetContactAttributeSet(ctx, models.ContactAttributeSetID(id))
 	if err != nil {
 		if isNotFound(err) {
 			resp.State.RemoveResource(ctx)
@@ -207,17 +205,17 @@ func (r *ContactAttributeSetResource) Update(ctx context.Context, req resource.U
 		return
 	}
 
-	var set *contactAttributeSetAPIResponse
+	var set *models.ContactAttributeSet
 	if !plan.Label.Equal(state.Label) {
-		body := map[string]interface{}{"label": plan.Label.ValueString()}
-		updated, err := rawUpdateContactAttributeSet(ctx, r.client, id, body)
+		label := plan.Label.ValueString()
+		updated, err := r.client.Contacts.UpdateContactAttributeSet(ctx, models.ContactAttributeSetID(id), &models.ContactAttributeSetUpdateRequest{Label: &label})
 		if err != nil {
 			resp.Diagnostics.AddError("Error updating contact attribute set", formatAPIError(err))
 			return
 		}
 		set = updated
 	} else {
-		current, err := rawGetContactAttributeSet(ctx, r.client, id)
+		current, err := r.client.Contacts.GetContactAttributeSet(ctx, models.ContactAttributeSetID(id))
 		if err != nil {
 			resp.Diagnostics.AddError("Error reading contact attribute set", formatAPIError(err))
 			return
@@ -239,7 +237,7 @@ func (r *ContactAttributeSetResource) Delete(ctx context.Context, req resource.D
 	if id == "" {
 		return
 	}
-	if err := rawDeleteContactAttributeSet(ctx, r.client, id); err != nil {
+	if err := r.client.Contacts.DeleteContactAttributeSet(ctx, models.ContactAttributeSetID(id)); err != nil {
 		if !isNotFound(err) {
 			resp.Diagnostics.AddError("Error deleting contact attribute set", formatAPIError(err))
 		}
@@ -252,15 +250,15 @@ func (r *ContactAttributeSetResource) ImportState(ctx context.Context, req resou
 }
 
 // populateContactAttributeSetModel copies API response fields onto the model.
-func populateContactAttributeSetModel(data *ContactAttributeSetResourceModel, s *contactAttributeSetAPIResponse, diags *diag.Diagnostics) {
-	data.ID = types.StringValue(s.ContactAttributeSetID)
-	data.ContactAttributeSetID = types.StringValue(s.ContactAttributeSetID)
-	data.OrganizationID = types.StringValue(s.OrganizationID)
+func populateContactAttributeSetModel(data *ContactAttributeSetResourceModel, s *models.ContactAttributeSet, diags *diag.Diagnostics) {
+	data.ID = types.StringValue(string(s.ContactAttributeSetID))
+	data.ContactAttributeSetID = types.StringValue(string(s.ContactAttributeSetID))
+	data.OrganizationID = types.StringValue(string(s.OrganizationID))
 	data.Label = types.StringValue(s.Label)
 	data.TLD = types.StringValue(s.TLD)
-	data.LinkedContacts = types.Int64Value(s.LinkedContacts)
-	data.CreatedOn = types.StringValue(s.CreatedOn.Format(time.RFC3339))
-	data.UpdatedOn = types.StringValue(s.UpdatedOn.Format(time.RFC3339))
+	data.LinkedContacts = types.Int64Value(int64(s.LinkedContacts))
+	data.CreatedOn = types.StringValue(formatContactTimestamp(s.CreatedOn))
+	data.UpdatedOn = types.StringValue(formatContactTimestamp(s.UpdatedOn))
 
 	elems := make(map[string]string, len(s.Attributes))
 	for k, v := range s.Attributes {

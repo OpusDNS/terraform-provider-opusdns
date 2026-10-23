@@ -3,11 +3,11 @@ package provider
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/opusdns/opusdns-go-client/models"
 	"github.com/opusdns/opusdns-go-client/opusdns"
 )
 
@@ -80,18 +80,18 @@ func (d *ContactAttributeSetDataSource) Read(ctx context.Context, req datasource
 		return
 	}
 
-	set, err := rawGetContactAttributeSet(ctx, d.client, data.ContactAttributeSetID.ValueString())
+	set, err := d.client.Contacts.GetContactAttributeSet(ctx, models.ContactAttributeSetID(data.ContactAttributeSetID.ValueString()))
 	if err != nil {
 		resp.Diagnostics.AddError("Error reading contact attribute set", formatAPIError(err))
 		return
 	}
 
-	data.OrganizationID = types.StringValue(set.OrganizationID)
+	data.OrganizationID = types.StringValue(string(set.OrganizationID))
 	data.Label = types.StringValue(set.Label)
 	data.TLD = types.StringValue(set.TLD)
-	data.LinkedContacts = types.Int64Value(set.LinkedContacts)
-	data.CreatedOn = types.StringValue(set.CreatedOn.Format(time.RFC3339))
-	data.UpdatedOn = types.StringValue(set.UpdatedOn.Format(time.RFC3339))
+	data.LinkedContacts = types.Int64Value(int64(set.LinkedContacts))
+	data.CreatedOn = types.StringValue(formatContactTimestamp(set.CreatedOn))
+	data.UpdatedOn = types.StringValue(formatContactTimestamp(set.UpdatedOn))
 
 	mv, diags := types.MapValueFrom(ctx, types.StringType, set.Attributes)
 	resp.Diagnostics.Append(diags...)

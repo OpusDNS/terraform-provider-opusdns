@@ -2,8 +2,6 @@ package provider
 
 import (
 	"context"
-	"encoding/json"
-	"fmt"
 
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
@@ -18,13 +16,10 @@ var _ datasource.DataSource = &TLDPortfolioDataSource{}
 // TLDPortfolioDataSource exposes the TLD portfolio enabled for the
 // caller's organization (`GET /v1/tlds/portfolio`).
 //
-// The endpoint actually returns a bare JSON array of `{"tld": "...",
-// "type": "..."}` objects — the SDK's `TLDs.GetPortfolio` helper assumes a
-// wrapper object and panics on the empty-string case, so this data source
-// bypasses the SDK helper and hits the endpoint via the raw HTTP client
-// (mirroring the approach in `datasource_roles.go`). Only the two fields
-// the upstream returns are surfaced; richer per-TLD details are still
-// available via the `opusdns_tld` data source.
+// The endpoint returns a bare JSON array of `{"tld": "...", "type": "..."}`
+// objects, which `TLDs.GetPortfolio` decodes. Only the two fields the
+// upstream returns are surfaced; richer per-TLD details are still available
+// via the `opusdns_tld` data source.
 type TLDPortfolioDataSource struct {
 	client *opusdns.Client
 }
@@ -87,38 +82,10 @@ func (d *TLDPortfolioDataSource) Configure(_ context.Context, req datasource.Con
 	}
 }
 
-// portfolioEntry mirrors the upstream TldResponseShort
-// (api/common/services/domain/tld_configuration.py): a tiny `{tld, type}`
-// object. Kept private to this file because it's the on-the-wire shape,
-// not part of the public model.
-type portfolioEntry struct {
-	TLD  string `json:"tld"`
-	Type string `json:"type"`
-}
-
 func (d *TLDPortfolioDataSource) Read(ctx context.Context, _ datasource.ReadRequest, resp *datasource.ReadResponse) {
-	path := d.client.HTTPClient().BuildPath("tlds", "portfolio")
-	httpResp, err := d.client.HTTPClient().Get(ctx, path, nil)
+	entries, err := d.client.TLDs.GetPortfolio(ctx)
 	if err != nil {
 		resp.Diagnostics.AddError("Error fetching TLD portfolio", formatAPIError(err))
-		return
-	}
-
-	// The endpoint returns a bare array; decode into a flat slice rather
-	// than the SDK's TLDPortfolio wrapper struct (which expects the legacy
-	// `{tlds, total, updated_on}` envelope that the API never emits).
-	var entries []portfolioEntry
-	if err := d.client.HTTPClient().DecodeResponse(httpResp, &entries); err != nil {
-		// Fall back to a generic decode so we can produce a helpful error
-		// rather than a cryptic JSON unmarshal failure if the API ever
-		// switches to a wrapped shape.
-		var raw json.RawMessage
-		_ = d.client.HTTPClient().DecodeResponse(httpResp, &raw)
-		resp.Diagnostics.AddError(
-			"Error decoding TLD portfolio response",
-			fmt.Sprintf("expected a JSON array of {tld,type} objects: %s\nraw body: %s",
-				err.Error(), string(raw)),
-		)
 		return
 	}
 
@@ -127,7 +94,7 @@ func (d *TLDPortfolioDataSource) Read(ctx context.Context, _ datasource.ReadRequ
 	for i, e := range entries {
 		obj, diags := types.ObjectValue(portfolioTLDAttrTypes, map[string]attr.Value{
 			"name": types.StringValue(e.TLD),
-			"type": types.StringValue(e.Type),
+			"type": types.StringValue(string(e.Type)),
 		})
 		resp.Diagnostics.Append(diags...)
 		if resp.Diagnostics.HasError() {

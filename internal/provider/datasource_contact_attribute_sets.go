@@ -3,12 +3,12 @@ package provider
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/opusdns/opusdns-go-client/models"
 	"github.com/opusdns/opusdns-go-client/opusdns"
 )
 
@@ -97,7 +97,10 @@ func (d *ContactAttributeSetsDataSource) Read(ctx context.Context, req datasourc
 		return
 	}
 
-	sets, err := rawListContactAttributeSets(ctx, d.client, stringValue(data.TLD), stringValue(data.Label))
+	sets, err := d.client.Contacts.ListContactAttributeSets(ctx, &models.ListContactAttributeSetsOptions{
+		TLD:   stringValue(data.TLD),
+		Label: stringValue(data.Label),
+	})
 	if err != nil {
 		resp.Diagnostics.AddError("Error listing contact attribute sets", formatAPIError(err))
 		return
@@ -113,14 +116,14 @@ func (d *ContactAttributeSetsDataSource) Read(ctx context.Context, req datasourc
 			return
 		}
 		obj, diags := types.ObjectValue(contactAttributeSetItemAttrTypes, map[string]attr.Value{
-			"contact_attribute_set_id": types.StringValue(s.ContactAttributeSetID),
-			"organization_id":          types.StringValue(s.OrganizationID),
+			"contact_attribute_set_id": types.StringValue(string(s.ContactAttributeSetID)),
+			"organization_id":          types.StringValue(string(s.OrganizationID)),
 			"label":                    types.StringValue(s.Label),
 			"tld":                      types.StringValue(s.TLD),
 			"attributes":               mv,
-			"linked_contacts":          types.Int64Value(s.LinkedContacts),
-			"created_on":               types.StringValue(s.CreatedOn.Format(time.RFC3339)),
-			"updated_on":               types.StringValue(s.UpdatedOn.Format(time.RFC3339)),
+			"linked_contacts":          types.Int64Value(int64(s.LinkedContacts)),
+			"created_on":               types.StringValue(formatContactTimestamp(s.CreatedOn)),
+			"updated_on":               types.StringValue(formatContactTimestamp(s.UpdatedOn)),
 		})
 		resp.Diagnostics.Append(diags...)
 		if resp.Diagnostics.HasError() {
