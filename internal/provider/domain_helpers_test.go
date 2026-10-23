@@ -156,7 +156,7 @@ func tfStringList(vals ...string) tftypes.Value {
 	return tftypes.NewValue(tftypes.List{ElementType: tftypes.String}, out)
 }
 
-func readDataSource(t *testing.T, ds datasource.DataSource, overrides map[string]tftypes.Value) datasource.ReadResponse {
+func readDataSourceWithOverrides(t *testing.T, ds datasource.DataSource, overrides map[string]tftypes.Value) datasource.ReadResponse {
 	t.Helper()
 	ctx := context.Background()
 	var sresp datasource.SchemaResponse
@@ -191,7 +191,7 @@ func TestDomainsDataSource_StatusTagFilterQuery(t *testing.T) {
 			domainJSON, page, page == 1)
 	})
 
-	resp := readDataSource(t, &DomainsDataSource{client: client}, map[string]tftypes.Value{
+	resp := readDataSourceWithOverrides(t, &DomainsDataSource{client: client}, map[string]tftypes.Value{
 		"tld":             tftypes.NewValue(tftypes.String, "com"),
 		"status_tags":     tfStringList("VERIFICATION_REQUIRED", "CREATE_REQUESTED"),
 		"status_tag_mode": tftypes.NewValue(tftypes.String, "match_all"),
@@ -240,7 +240,7 @@ func TestDomainsDataSource_PlainQueryHasNoStatusTagParams(t *testing.T) {
 		return 200, `{"results": [` + domainJSON + `], "pagination": {"current_page": 1, "total_pages": 1, "has_next_page": false, "page_size": 100}}`
 	})
 	// status_tag_mode alone does not request status tags, as before.
-	resp := readDataSource(t, &DomainsDataSource{client: client}, map[string]tftypes.Value{
+	resp := readDataSourceWithOverrides(t, &DomainsDataSource{client: client}, map[string]tftypes.Value{
 		"search":          tftypes.NewValue(tftypes.String, "exam"),
 		"status_tag_mode": tftypes.NewValue(tftypes.String, "match_all"),
 	})
@@ -267,7 +267,7 @@ func TestDomainsDataSource_IncludeTagsOnly(t *testing.T) {
 	client, requests := newRecordingClient(t, func(recordedRequest) (int, string) {
 		return 200, `{"results": [` + domainJSON + `], "pagination": {"current_page": 1, "total_pages": 1, "has_next_page": false, "page_size": 100}}`
 	})
-	resp := readDataSource(t, &DomainsDataSource{client: client}, map[string]tftypes.Value{
+	resp := readDataSourceWithOverrides(t, &DomainsDataSource{client: client}, map[string]tftypes.Value{
 		"include_tags": tftypes.NewValue(tftypes.Bool, true),
 	})
 	if resp.Diagnostics.HasError() {
@@ -282,7 +282,7 @@ func TestDomainsDataSource_IncludeTagsOnly(t *testing.T) {
 func TestDomainDataSource_IncludeTagsReturnsStatusTags(t *testing.T) {
 	for _, include := range []bool{true, false} {
 		client, requests := newRecordingClient(t, func(recordedRequest) (int, string) { return 200, domainJSON })
-		resp := readDataSource(t, &DomainDataSource{client: client}, map[string]tftypes.Value{
+		resp := readDataSourceWithOverrides(t, &DomainDataSource{client: client}, map[string]tftypes.Value{
 			"domain_ref":   tftypes.NewValue(tftypes.String, "example.com"),
 			"include_tags": tftypes.NewValue(tftypes.Bool, include),
 		})
@@ -414,7 +414,7 @@ func TestClaimsNoticeDataSource_Read(t *testing.T) {
   "notice_footer_url": "https://example.com/footer"
 }]}`
 	})
-	resp := readDataSource(t, &ClaimsNoticeDataSource{client: client}, map[string]tftypes.Value{
+	resp := readDataSourceWithOverrides(t, &ClaimsNoticeDataSource{client: client}, map[string]tftypes.Value{
 		"claims_key": tftypes.NewValue(tftypes.String, "key-1"),
 	})
 	if resp.Diagnostics.HasError() {
@@ -435,7 +435,7 @@ func TestClaimsNoticeDataSource_Read(t *testing.T) {
 
 func TestClaimsNoticeDataSource_EmptyResultIsError(t *testing.T) {
 	client, _ := newRecordingClient(t, func(recordedRequest) (int, string) { return 200, `{"claims_notices": []}` })
-	resp := readDataSource(t, &ClaimsNoticeDataSource{client: client}, map[string]tftypes.Value{
+	resp := readDataSourceWithOverrides(t, &ClaimsNoticeDataSource{client: client}, map[string]tftypes.Value{
 		"claims_key": tftypes.NewValue(tftypes.String, "gone"),
 	})
 	if !resp.Diagnostics.HasError() || resp.Diagnostics.Errors()[0].Summary() != "No claims notice returned" {
@@ -452,7 +452,7 @@ func TestDomainCheckDataSource_Read(t *testing.T) {
   {"domain": "taken.com", "available": false, "reason": "registered", "is_premium": false}
 ]}`
 	})
-	resp := readDataSource(t, &DomainCheckDataSource{client: client}, map[string]tftypes.Value{
+	resp := readDataSourceWithOverrides(t, &DomainCheckDataSource{client: client}, map[string]tftypes.Value{
 		"domains": tfStringList("free.com", "premium.com", "taken.com"),
 	})
 	if resp.Diagnostics.HasError() {
