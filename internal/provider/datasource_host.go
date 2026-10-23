@@ -3,7 +3,6 @@ package provider
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/datasourcevalidator"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
@@ -103,7 +102,7 @@ func (d *HostDataSource) Read(ctx context.Context, req datasource.ReadRequest, r
 		return
 	}
 
-	host, err := rawGetHost(ctx, d.client, ref)
+	host, err := d.client.Hosts.GetHost(ctx, ref)
 	if err != nil {
 		resp.Diagnostics.AddError("Error reading host", formatAPIError(err))
 		return
@@ -119,12 +118,12 @@ func (d *HostDataSource) Read(ctx context.Context, req datasource.ReadRequest, r
 		return
 	}
 
-	data.ID = types.StringValue(host.HostID)
-	data.HostID = types.StringValue(host.HostID)
+	data.ID = types.StringValue(string(host.HostID))
+	data.HostID = types.StringValue(string(host.HostID))
 	data.Hostname = types.StringValue(host.Hostname)
 	data.IPAddresses = ipSet
-	data.CreatedOn = types.StringValue(host.CreatedOn.Format(time.RFC3339))
-	data.UpdatedOn = types.StringValue(host.UpdatedOn.Format(time.RFC3339))
+	data.CreatedOn = timePtrToValue(host.CreatedOn)
+	data.UpdatedOn = timePtrToValue(host.UpdatedOn)
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }

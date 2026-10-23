@@ -3,7 +3,6 @@ package provider
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/setvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
@@ -15,6 +14,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/opusdns/opusdns-go-client/models"
 	"github.com/opusdns/opusdns-go-client/opusdns"
 )
 
@@ -28,11 +28,8 @@ var _ resource.ResourceWithImportState = &HostResource{}
 // are subordinate to those domains (e.g. `ns1.example.com` as a nameserver
 // for `example.com`).
 //
-// The OpusDNS SDK at v1.0.9 does not expose a typed Hosts service, so this
-// resource is implemented directly against the SDK's low-level HTTPClient
-// (which preserves the provider's bearer-token transport). See
-// api/api/host/v1_routes.py and common/models/domain/host.py for the
-// underlying API contract.
+// It uses the SDK's typed Hosts service. See api/api/host/v1_routes.py and
+// common/models/domain/host.py for the underlying API contract.
 type HostResource struct {
 	client *opusdns.Client
 }
@@ -46,15 +43,6 @@ type HostResourceModel struct {
 	IPAddresses types.Set    `tfsdk:"ip_addresses"`
 	CreatedOn   types.String `tfsdk:"created_on"`
 	UpdatedOn   types.String `tfsdk:"updated_on"`
-}
-
-// hostAPIResponse mirrors common/models/domain/host.py:HostResponse.
-type hostAPIResponse struct {
-	HostID      string    `json:"host_id"`
-	Hostname    string    `json:"hostname"`
-	IPAddresses []string  `json:"ip_addresses"`
-	CreatedOn   time.Time `json:"created_on"`
-	UpdatedOn   time.Time `json:"updated_on"`
 }
 
 // NewHostResource returns a new HostResource.
@@ -140,12 +128,10 @@ func (r *HostResource) Create(ctx context.Context, req resource.CreateRequest, r
 		return
 	}
 
-	body := map[string]interface{}{
-		"hostname":     data.Hostname.ValueString(),
-		"ip_addresses": ips,
-	}
-
-	host, err := rawCreateHost(ctx, r.client, body)
+	host, err := r.client.Hosts.CreateHost(ctx, &models.HostCreateRequest{
+		Hostname:    data.Hostname.ValueString(),
+		IPAddresses: ips,
+	})
 	if err != nil {
 		resp.Diagnostics.AddError("Error creating host", formatAPIError(err))
 		return
@@ -172,7 +158,7 @@ func (r *HostResource) Read(ctx context.Context, req resource.ReadRequest, resp 
 		return
 	}
 
-	host, err := rawGetHost(ctx, r.client, hostID)
+	host, err := r.client.Hosts.GetHost(ctx, hostID)
 	if err != nil {
 		if isNotFound(err) {
 			resp.State.RemoveResource(ctx)
@@ -213,17 +199,16 @@ func (r *HostResource) Update(ctx context.Context, req resource.UpdateRequest, r
 		return
 	}
 
-	var host *hostAPIResponse
+	var host *models.Host
 	if !plan.IPAddresses.Equal(state.IPAddresses) {
-		body := map[string]interface{}{"ip_addresses": planIPs}
-		updated, err := rawUpdateHost(ctx, r.client, hostID, body)
+		updated, err := r.client.Hosts.UpdateHost(ctx, hostID, &models.HostUpdateRequest{IPAddresses: planIPs})
 		if err != nil {
 			resp.Diagnostics.AddError("Error updating host", formatAPIError(err))
 			return
 		}
 		host = updated
 	} else {
-		current, err := rawGetHost(ctx, r.client, hostID)
+		current, err := r.client.Hosts.GetHost(ctx, hostID)
 		if err != nil {
 			resp.Diagnostics.AddError("Error reading host", formatAPIError(err))
 			return
@@ -252,7 +237,7 @@ func (r *HostResource) Delete(ctx context.Context, req resource.DeleteRequest, r
 		return
 	}
 
-	if err := rawDeleteHost(ctx, r.client, hostID); err != nil {
+	if err := r.client.Hosts.DeleteHost(ctx, hostID); err != nil {
 		if !isNotFound(err) {
 			resp.Diagnostics.AddError("Error deleting host", formatAPIError(err))
 		}
@@ -267,9 +252,9 @@ func (r *HostResource) ImportState(ctx context.Context, req resource.ImportState
 }
 
 // populateHostModel copies API response fields onto a HostResourceModel.
-func populateHostModel(_ context.Context, data *HostResourceModel, h *hostAPIResponse, diags *diag.Diagnostics) {
-	data.ID = types.StringValue(h.HostID)
-	data.HostID = types.StringValue(h.HostID)
+func populateHostModel(_ context.Context, data *HostResourceModel, h *models.Host, diags *diag.Diagnostics) {
+	data.ID = types.StringValue(string(h.HostID))
+	data.HostID = types.StringValue(string(h.HostID))
 	data.Hostname = types.StringValue(h.Hostname)
 
 	// ip_addresses is modelled as a set: order is not significant to the API
@@ -283,6 +268,6 @@ func populateHostModel(_ context.Context, data *HostResourceModel, h *hostAPIRes
 	diags.Append(d...)
 	data.IPAddresses = set
 
-	data.CreatedOn = types.StringValue(h.CreatedOn.Format(time.RFC3339))
-	data.UpdatedOn = types.StringValue(h.UpdatedOn.Format(time.RFC3339))
+	data.CreatedOn = timePtrToValue(h.CreatedOn)
+	data.UpdatedOn = timePtrToValue(h.UpdatedOn)
 }
