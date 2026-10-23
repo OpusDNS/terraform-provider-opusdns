@@ -9,90 +9,59 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [1.3.0] - 2026-10-23
 
-> **Upgrade note:** this release removes and reshapes data-source attributes
-> (see **Changed** and **Removed**). A `~> 1.0` version constraint picks it up;
-> pin `~> 1.2.0` to stay on 1.2.x until your configuration is updated.
+This release moves the provider to [opusdns-go-client v1.3.2](https://github.com/OpusDNS/opusdns-go-client/releases/tag/v1.3.2), which matches the OpusDNS API (api-spec **1.243.0**, up from 1.147.0). The previous SDK decoded several responses into the wrong shape, so some data sources returned empty values without an error. Those data sources now read what the API actually sends. Their schemas follow the API, which removes and renames some attributes.
 
-### Changed
+> [!WARNING]
+> **This minor release contains breaking changes.** It removes and reshapes data-source attributes. A configuration that still references one of them fails to plan after the upgrade. Almost all of them had no effect before: the API does not send these fields or support these filters, so they were empty, zero or ignored. Please review the list below before upgrading.
+>
+> A `~> 1.0` version constraint picks up this release. Pin `~> 1.2.0` to stay on 1.2.x until your configuration is updated.
 
-- **Upgraded `opusdns-go-client` `v1.1.1` → `v1.3.2`** (OpusDNS API spec
-  1.147.0 → 1.243.0; see the
-  [v1.3.0](https://github.com/OpusDNS/opusdns-go-client/releases/tag/v1.3.0),
-  [v1.3.1](https://github.com/OpusDNS/opusdns-go-client/releases/tag/v1.3.1)
-  and [v1.3.2](https://github.com/OpusDNS/opusdns-go-client/releases/tag/v1.3.2)
-  release notes). The SDK now decodes the API's real response shapes, so
-  several data-source schemas changed (see below and **Removed**). The SDK also:
-  - no longer resends POST/PATCH/DELETE requests after a 5xx or dropped
-    connection, and rejects requests with an empty ID before sending them;
-  - resends a request the API answers with a 409 or 503 and a `Retry-After`
-    header. The API answers `409 ERROR_DOMAIN_SUBSCRIPTION_PENDING` when a
-    domain is deleted in the seconds before its registration is finalized, so
-    destroying an `opusdns_domain` right after creating it now waits and
-    succeeds instead of failing.
-- **`opusdns_tld`** is reshaped to the TLD specification the API returns:
-  - `idn_supported`, `dnssec_supported`, `min_domain_length`,
-    `max_domain_length`, `whois_server`, `rdap_server`, `nameserver_config`
-    (`min`/`max`) and `contact_config` are kept. `contact_config[*].required`
-    is now derived from `min > 0`.
-  - `min_registration_period` / `max_registration_period` are replaced by
-    `registration_periods` (list of `{value, unit}`); a new `renewal_periods`
-    list is added.
-  - `grace_period_days` / `redemption_period_days` are replaced by
-    `grace_period` / `redemption_period`, ISO 8601 duration strings
-    (e.g. `P30D`).
-  - `restrictions` is replaced by `local_presence` (`required`,
-    `eligible_countries`).
-  - `phases[*]`: `status` is replaced by `supported`, `requirements` by
-    `smd_required`; unset `start_date` / `end_date` / `allocation_method` are
-    now `null` instead of an empty string.
-- **`opusdns_domains_summary`** reads the new summary shape. The attributes are
-  unchanged; `expiring_within_30_days` / `expiring_within_90_days` are `null`
-  when the API reports no expiry counts, and `total_domains` includes
-  sub-organizations.
+### ⚠️ Breaking changes
+
+#### `opusdns_tld`
+
+The data source now reads the TLD specification that the API returns. With the previous SDK, most of its attributes were empty.
+
+| Removed | Use instead |
+|---|---|
+| `min_registration_period`, `max_registration_period` | `registration_periods`, a list of `{value, unit}` |
+| `grace_period_days`, `redemption_period_days` | `grace_period`, `redemption_period`, ISO 8601 durations such as `P30D` |
+| `restrictions` | `local_presence` (`required`, `eligible_countries`) |
+| `phases[*].status` | `phases[*].supported` |
+| `phases[*].requirements` | `phases[*].smd_required` |
+| `available`, `registration_enabled`, `transfer_enabled`, `description`, `registry`, `pricing`, `nameserver_config.glue_records_required` | no replacement: the TLD specification has no such data, and no prices |
+
+Also changed:
+- `phases[*].name` holds the phase type.
+- Unset `phases[*].start_date`, `end_date` and `allocation_method` are `null` instead of `""`.
+- `contact_config[*].required` is derived from `min > 0`.
+
+These attributes are kept and filled from the specification: `idn_supported`, `dnssec_supported`, `min_domain_length`, `max_domain_length`, `whois_server`, `rdap_server`, `nameserver_config` (`min`, `max`), `contact_config` and `type`. `renewal_periods` is new.
+
+#### `opusdns_contact` and `opusdns_contacts`
+- `updated_on` is removed. The API does not send it.
+- `opusdns_contacts`: the `verified` filter is removed. The API does not support it.
+
+#### `opusdns_domains`
+- The `status` and `renewal_mode` filters are removed. `GET /v1/domains` has no such query parameters, so they never filtered anything.
+
+### Behaviour changes
+
+- **No more duplicate writes:** a POST, PATCH or DELETE request (creates, deletes and most updates) is no longer resent after a 5xx or a dropped connection, because the API may already have acted on it (a double registration or charge). Terraform reports the error instead. Run `terraform plan` to see the actual state before you apply again.
+- **Requests the API asks to resend are retried:** a 409 or 503 that carries a `Retry-After` header is retried, for every request. The API answers `409 ERROR_DOMAIN_SUBSCRIPTION_PENDING` when a domain is deleted in the seconds before its registration is finalized, so destroying an `opusdns_domain` right after creating it waits and then succeeds.
+- **Invalid IDs fail early:** a request with an empty resource ID fails before it is sent, with a clear error, instead of reaching a wrong API route.
+
+### Fixes
+
+- **`opusdns_tlds`** fills `idn_supported`, `dnssec_supported` and `min_`/`max_registration_period`. Before, these were always `false` or `0`, so `dnssec_supported = true` returned no TLDs. The periods count only whole years, and they are `null` when a TLD offers none.
+- **`opusdns_domains_summary`** reads the API's current summary. Its attributes are unchanged.
+  - `total_domains` includes sub-organizations.
+  - `expiring_within_30_days` and `expiring_within_90_days` are `null` when the API reports no expiry counts.
 
 ### Deprecated
-
-- **`opusdns_tlds`**: the `registration_enabled` filter and the
-  `tlds[*].registration_enabled` / `tlds[*].transfer_enabled` attributes. The
-  OpusDNS API has no such flags. The filter is ignored with a warning (it used
-  to match nothing when set to `true`), and the attributes are always `null`.
-  Use `available` instead of `registration_enabled`.
-
-### Removed
-
-- **Removed with the `opusdns-go-client` `v1.3.0` upgrade** (the current API no
-  longer returns or accepts them). Configurations referencing these must be
-  updated:
-  - `opusdns_contacts`: the `verified` filter. `opusdns_contact` /
-    `opusdns_contacts`: `updated_on`.
-  - `opusdns_domains`: the `status` and `renewal_mode` filters. The API has no
-    such query parameters, so they were ignored.
-  - `opusdns_tld`: `available`, `registration_enabled`, `transfer_enabled`,
-    `description`, `registry`, `pricing`, `restrictions`,
-    `min_registration_period`, `max_registration_period`,
-    `grace_period_days`, `redemption_period_days`,
-    `nameserver_config.glue_records_required`, `phases[*].status` and
-    `phases[*].requirements` (see **Changed** for the replacements).
-    There is no replacement for `pricing`: the TLD specification carries no
-    prices.
-
-### Fixed
-
-- **`opusdns_tlds`** now fills `idn_supported`, `dnssec_supported` and
-  `min_`/`max_registration_period` from the TLD specification. Before, they
-  were always `false`/`0`, so `dnssec_supported = true` returned no TLDs.
-  `min_`/`max_registration_period` count only whole-year periods and are
-  `null` when a TLD offers none.
-
-### Notes
-
-- `opusdns_user` (data source and resource) and `opusdns_users`: the already
-  deprecated `status` attribute stays in the schema and is always `null`; the
-  SDK no longer has a user status.
-- The `opusdns_tld_portfolio` raw-HTTP workaround for the SDK's
-  `TLDs.GetPortfolio` schema mismatch is retained. SDK `v1.3.0` now returns
-  `[]models.TLDPortfolioEntry` for the bare-array response, so the workaround
-  can be dropped in a follow-up.
+These are still in the schema, but they have no effect or are always `null`:
+- `opusdns_tlds`: the `registration_enabled` filter, which is ignored with a warning (it used to match nothing), and `tlds[*].registration_enabled` / `tlds[*].transfer_enabled`. The API has no such flags. Use `available`.
+- `opusdns_user`, `opusdns_users` and the `opusdns_user` resource: `status`, which the API no longer returns. It was deprecated in v1.2.1.
 
 ## [1.2.1] - 2026-07-16
 
