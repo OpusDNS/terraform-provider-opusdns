@@ -83,6 +83,9 @@ func (d *UserPermissionsDataSource) Read(ctx context.Context, req datasource.Rea
 		return
 	}
 
+	// Deliberately raw rather than Users.GetUserPermissions: that method decodes
+	// into models.PermissionSet and drops everything but `permissions`, while
+	// `permissions_json` is documented to carry the raw response body.
 	path := d.client.HTTPClient().BuildPath("users", data.UserID.ValueString(), "permissions")
 	httpResp, err := d.client.HTTPClient().Get(ctx, path, nil)
 	if err != nil {
