@@ -7,14 +7,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Fixed
+## [1.3.1] - 2026-10-23
 
-- **`opusdns_domain`** sends `expected_price` as a decimal string (`"12.50"`),
-  as the API requires. Before, it sent a JSON number, which the API rejects
-  with `expected_price must be a decimal string, not a number`, so registering
-  a premium domain with `expected_price` failed. A price with more than two
-  decimal places is sent unrounded and still rejected, rather than confirming
-  a different price.
+This patch release fixes premium domain registrations that set `expected_price`. It also moves the provider's remaining raw API calls to the typed methods of [opusdns-go-client v1.3.2](https://github.com/OpusDNS/opusdns-go-client/releases/tag/v1.3.2). It has no breaking changes.
+
+> [!IMPORTANT]
+> **Upgrading from v1.2.x or earlier?** v1.3.0 contains breaking changes: it removes and reshapes data-source attributes. Read the [v1.3.0 release notes](https://github.com/OpusDNS/terraform-provider-opusdns/releases/tag/v1.3.0) (section "Breaking changes") before you upgrade. v1.3.1 adds nothing that breaks on top of them.
+
+### Fixes
+
+- **`opusdns_domain`: `expected_price` is sent as a decimal string** (`"12.50"`), as the API requires. Before, the provider sent a JSON number. The API rejects that with `expected_price must be a decimal string, not a number`, so registering a premium domain with `expected_price` failed.
+  - A price with more than two decimal places is sent unrounded, so the API still rejects it instead of confirming a different price.
+
+### Changes
+
+These data sources and resources now call the typed client instead of building the HTTP request themselves:
+- `opusdns_host` (resource and data source)
+- `opusdns_contact_attribute_set` (resource and data sources) and `opusdns_contact_attribute_link`
+- `opusdns_tld_portfolio`
+- `opusdns_domains` and `opusdns_domain`, including the status-tag filters and `include_tags`
+- `opusdns_domain` create, with `expected_price` and `claims_notice_acceptance_hash`
+- `opusdns_claims_notice` and `opusdns_domain_check`
+
+Schemas, documentation and the requests sent are unchanged, except for the `expected_price` fix above. A few details differ:
+- **Errors for an unexpected API response:**
+  - `opusdns_tld_portfolio`, `opusdns_claims_notice` and `opusdns_domain_check` report it under their usual error ("Error fetching TLD portfolio", "Error retrieving claims notice", "Error checking domains"), with the client's decode error. Before, it had a separate "Error decoding …" summary.
+- **Timestamp filters:** the timestamp filters of `opusdns_domains` keep sub-second precision when you set it.
+- **Host timestamps:** `opusdns_host` stores `null` for `created_on` or `updated_on` if the API omits one, instead of `0001-01-01T00:00:00Z`. The API sends both.
+
+These stay raw on purpose:
+- Parking and registrar credentials: their endpoints are not part of the public API specification or the Go client.
+- `opusdns_user_permissions`: its `permissions_json` attribute is the raw response body.
 
 ## [1.3.0] - 2026-10-23
 
@@ -216,7 +239,8 @@ on `terraform-plugin-framework`.
   release because the API does not offer lifecycle semantics that fit
   Terraform. Organization read-only data sources remain.
 
-[Unreleased]: https://github.com/OpusDNS/terraform-provider-opusdns/compare/v1.3.0...HEAD
+[Unreleased]: https://github.com/OpusDNS/terraform-provider-opusdns/compare/v1.3.1...HEAD
+[1.3.1]: https://github.com/OpusDNS/terraform-provider-opusdns/compare/v1.3.0...v1.3.1
 [1.3.0]: https://github.com/OpusDNS/terraform-provider-opusdns/compare/v1.2.1...v1.3.0
 [1.2.1]: https://github.com/OpusDNS/terraform-provider-opusdns/compare/v1.2.0...v1.2.1
 [1.2.0]: https://github.com/OpusDNS/terraform-provider-opusdns/compare/v1.1.0...v1.2.0
