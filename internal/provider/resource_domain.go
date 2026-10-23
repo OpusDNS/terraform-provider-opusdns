@@ -335,38 +335,17 @@ func (r *DomainResource) Create(ctx context.Context, req resource.CreateRequest,
 			CreateZone:  data.CreateZone.ValueBool(),
 		}
 
-		hasExpectedPrice := !data.ExpectedPrice.IsNull() && !data.ExpectedPrice.IsUnknown()
-		hasClaimsHash := optionalStringPtr(data.ClaimsNoticeHash) != nil
-
-		if hasExpectedPrice || hasClaimsHash {
-			// The SDK's DomainCreateRequest cannot carry expected_price or
-			// claims_notice_acceptance_hash, so serialise the standard request
-			// to a JSON map, add the extra create-only fields, and POST it raw.
-			body, bErr := domainCreateRequestToMap(createReq)
-			if bErr != nil {
-				resp.Diagnostics.AddError("Error building domain registration request", bErr.Error())
-				return
-			}
-			if hasExpectedPrice {
-				body["expected_price"] = data.ExpectedPrice.ValueFloat64()
-			}
-			if hasClaimsHash {
-				body["claims_notice_acceptance_hash"] = data.ClaimsNoticeHash.ValueString()
-			}
-			created, err := rawCreateDomain(ctx, r.client, body)
-			if err != nil {
-				resp.Diagnostics.AddError("Error creating domain", formatAPIError(err))
-				return
-			}
-			domain = created
-		} else {
-			created, err := r.client.Domains.CreateDomain(ctx, createReq)
-			if err != nil {
-				resp.Diagnostics.AddError("Error creating domain", formatAPIError(err))
-				return
-			}
-			domain = created
+		if !data.ExpectedPrice.IsNull() && !data.ExpectedPrice.IsUnknown() {
+			createReq.ExpectedPrice = models.StringPtr(formatExpectedPrice(data.ExpectedPrice.ValueFloat64()))
 		}
+		createReq.ClaimsNoticeAcceptanceHash = optionalStringPtr(data.ClaimsNoticeHash)
+
+		created, err := r.client.Domains.CreateDomain(ctx, createReq)
+		if err != nil {
+			resp.Diagnostics.AddError("Error creating domain", formatAPIError(err))
+			return
+		}
+		domain = created
 	}
 
 	// The API doesn't accept transfer_lock at create/transfer time, so reconcile

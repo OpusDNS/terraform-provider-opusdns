@@ -35,23 +35,6 @@ type ClaimsNoticeDataSourceModel struct {
 	RenderedHTML               types.String `tfsdk:"rendered_html"`
 }
 
-// claimsNoticesAPIResponse mirrors ClaimsNoticesResponse.
-type claimsNoticesAPIResponse struct {
-	ClaimsNotices []claimsNoticeEntry `json:"claims_notices"`
-}
-
-type claimsNoticeEntry struct {
-	ClaimsKey                  string `json:"claims_key"`
-	ClaimsNoticeAcceptanceHash string `json:"claims_notice_acceptance_hash"`
-	Label                      string `json:"label"`
-	NoticeTitle                string `json:"notice_title"`
-	NoticeIntro                string `json:"notice_intro"`
-	NoticeNotExactMatchIntro   string `json:"notice_not_exact_match_intro"`
-	NoticeFooter               string `json:"notice_footer"`
-	NoticeFooterURL            string `json:"notice_footer_url"`
-	RenderedHTML               string `json:"rendered_html"`
-}
-
 func NewClaimsNoticeDataSource() datasource.DataSource {
 	return &ClaimsNoticeDataSource{}
 }
@@ -106,22 +89,12 @@ func (d *ClaimsNoticeDataSource) Read(ctx context.Context, req datasource.ReadRe
 		return
 	}
 
-	body := map[string]interface{}{
-		"claims_keys": []string{data.ClaimsKey.ValueString()},
-	}
-	path := d.client.HTTPClient().BuildPath("domains", "claims-notices")
-	httpResp, err := d.client.HTTPClient().Post(ctx, path, body)
+	notices, err := d.client.Domains.GetClaimsNotices(ctx, data.ClaimsKey.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError("Error retrieving claims notice", formatAPIError(err))
 		return
 	}
-
-	var out claimsNoticesAPIResponse
-	if err := d.client.HTTPClient().DecodeResponse(httpResp, &out); err != nil {
-		resp.Diagnostics.AddError("Error decoding claims notice response", formatAPIError(err))
-		return
-	}
-	if len(out.ClaimsNotices) == 0 {
+	if len(notices) == 0 {
 		resp.Diagnostics.AddError(
 			"No claims notice returned",
 			"The API returned an empty claims_notices list for the supplied key. The key may have expired or be invalid.",
@@ -129,7 +102,7 @@ func (d *ClaimsNoticeDataSource) Read(ctx context.Context, req datasource.ReadRe
 		return
 	}
 
-	n := out.ClaimsNotices[0]
+	n := notices[0]
 	data.ClaimsKey = types.StringValue(n.ClaimsKey)
 	data.Label = types.StringValue(n.Label)
 	data.ClaimsNoticeAcceptanceHash = types.StringValue(n.ClaimsNoticeAcceptanceHash)
