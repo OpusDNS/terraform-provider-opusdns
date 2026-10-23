@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **`opusdns_domain`** sends `expected_price` as a decimal string (`"12.50"`),
+  as the API requires. Before, it sent a JSON number, which the API rejects
+  with `expected_price must be a decimal string, not a number`, so registering
+  a premium domain with `expected_price` failed. A price with more than two
+  decimal places is sent unrounded and still rejected, rather than confirming
+  a different price.
+
 ## [1.3.0] - 2026-10-23
 
 This release moves the provider to [opusdns-go-client v1.3.2](https://github.com/OpusDNS/opusdns-go-client/releases/tag/v1.3.2), which matches the OpusDNS API (api-spec **1.243.0**, up from 1.147.0). The previous SDK decoded several responses into the wrong shape, so some data sources returned empty values without an error. Those data sources now read what the API actually sends. Their schemas follow the API, which removes and renames some attributes.
