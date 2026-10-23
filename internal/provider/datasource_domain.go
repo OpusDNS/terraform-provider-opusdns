@@ -133,26 +133,19 @@ func (d *DomainDataSource) Read(ctx context.Context, req datasource.ReadRequest,
 		return
 	}
 
-	var domain *models.Domain
+	var getOpts *models.GetDomainOptions
+	if !data.IncludeTags.IsNull() && !data.IncludeTags.IsUnknown() && data.IncludeTags.ValueBool() {
+		// include=tags returns the user tags and the status_tags array.
+		getOpts = &models.GetDomainOptions{Include: []models.DomainIncludeField{models.DomainIncludeTags}}
+	}
+	domain, err := d.client.Domains.GetDomainWithOptions(ctx, data.DomainRef.ValueString(), getOpts)
+	if err != nil {
+		resp.Diagnostics.AddError("Error reading domain", formatAPIError(err))
+		return
+	}
 	var statusTags []string
-	var err error
-	includeTags := !data.IncludeTags.IsNull() && !data.IncludeTags.IsUnknown() && data.IncludeTags.ValueBool()
-	if includeTags {
-		// The SDK's models.Domain omits the status_tags array, so use the raw
-		// include=tags wrapper to capture it alongside user tags.
-		raw, rErr := rawGetDomainWithStatusTags(ctx, d.client, data.DomainRef.ValueString())
-		if rErr != nil {
-			resp.Diagnostics.AddError("Error reading domain", formatAPIError(rErr))
-			return
-		}
-		domain = &raw.Domain
-		statusTags = statusTagTypesToStrings(raw.StatusTags)
-	} else {
-		domain, err = d.client.Domains.GetDomain(ctx, data.DomainRef.ValueString())
-		if err != nil {
-			resp.Diagnostics.AddError("Error reading domain", formatAPIError(err))
-			return
-		}
+	if getOpts != nil {
+		statusTags = statusTagTypesToStrings(domain.StatusTags)
 	}
 	dn := domain
 

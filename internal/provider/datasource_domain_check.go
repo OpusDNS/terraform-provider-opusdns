@@ -3,7 +3,6 @@ package provider
 import (
 	"context"
 	"fmt"
-	"net/url"
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/listvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
@@ -27,30 +26,6 @@ type DomainCheckDataSourceModel struct {
 	ID      types.String `tfsdk:"id"`
 	Domains types.List   `tfsdk:"domains"`
 	Results types.List   `tfsdk:"results"`
-}
-
-// domainCheckAPIResponse mirrors DomainCheckResponse / DomainAvailabilityResponse.
-type domainCheckAPIResponse struct {
-	Results []domainAvailabilityEntry `json:"results"`
-}
-
-type domainAvailabilityEntry struct {
-	Domain         string                  `json:"domain"`
-	Available      bool                    `json:"available"`
-	Reason         *string                 `json:"reason"`
-	IsPremium      bool                    `json:"is_premium"`
-	ClaimsKey      *string                 `json:"claims_key"`
-	PremiumPricing *premiumPricingResponse `json:"premium_pricing"`
-}
-
-type premiumPricingResponse struct {
-	Prices []premiumPricingAction `json:"prices"`
-}
-
-type premiumPricingAction struct {
-	Action   string `json:"action"`
-	Price    string `json:"price"`
-	Currency string `json:"currency"`
 }
 
 var domainCheckPremiumPriceAttrTypes = map[string]attr.Type{
@@ -148,21 +123,9 @@ func (d *DomainCheckDataSource) Read(ctx context.Context, req datasource.ReadReq
 		return
 	}
 
-	query := url.Values{}
-	for _, domain := range domains {
-		query.Add("domains", domain)
-	}
-
-	path := d.client.HTTPClient().BuildPath("domains", "check")
-	httpResp, err := d.client.HTTPClient().Get(ctx, path, query)
+	out, err := d.client.Domains.CheckDomains(ctx, domains)
 	if err != nil {
 		resp.Diagnostics.AddError("Error checking domains", formatAPIError(err))
-		return
-	}
-
-	var out domainCheckAPIResponse
-	if err := d.client.HTTPClient().DecodeResponse(httpResp, &out); err != nil {
-		resp.Diagnostics.AddError("Error decoding domain check response", formatAPIError(err))
 		return
 	}
 
@@ -197,7 +160,7 @@ func (d *DomainCheckDataSource) Read(ctx context.Context, req datasource.ReadReq
 			"domain":          types.StringValue(r.Domain),
 			"available":       types.BoolValue(r.Available),
 			"reason":          stringPtrToValue(r.Reason),
-			"is_premium":      types.BoolValue(r.IsPremium),
+			"is_premium":      types.BoolValue(r.IsPremium != nil && *r.IsPremium),
 			"claims_key":      stringPtrToValue(r.ClaimsKey),
 			"premium_pricing": priceList,
 		})

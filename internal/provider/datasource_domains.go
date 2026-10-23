@@ -306,46 +306,39 @@ func (d *DomainsDataSource) Read(ctx context.Context, req datasource.ReadRequest
 	statusTagMode := stringValue(data.StatusTagMode)
 	includeTags := !data.IncludeTags.IsNull() && !data.IncludeTags.IsUnknown() && data.IncludeTags.ValueBool()
 
-	// The SDK's ListDomainsOptions cannot express the status-tag filters, and
-	// its models.Domain omits the status_tags array. Fall back to the raw HTTP
-	// wrapper only when the caller filters by status tags or requests tags via
-	// include_tags (which also carries status_tags). Otherwise keep the SDK
-	// path so no existing filter behaviour regresses.
-	useRawStatusTags := len(statusTagFilters) > 0 || includeTags
+	// status_tags is only populated by the API when include=tags is requested,
+	// so a status-tag filter or include_tags both request it. Without either,
+	// the list is requested exactly as before and status_tags stays empty.
+	withStatusTags := len(statusTagFilters) > 0 || includeTags
+	if withStatusTags {
+		if !includeTags {
+			opts.Include = append(opts.Include, models.DomainIncludeTags)
+		}
+		for _, t := range statusTagFilters {
+			opts.StatusTags = append(opts.StatusTags, models.StatusTagType(t))
+		}
+		opts.StatusTagMode = models.TagFilterMode(statusTagMode)
+	}
 
 	objType := types.ObjectType{AttrTypes: domainItemAttrTypes}
-	var values []attr.Value
 
-	if useRawStatusTags {
-		rawDomains, err := rawListDomainsWithStatusTags(ctx, d.client, opts, statusTagFilters, statusTagMode)
-		if err != nil {
-			resp.Diagnostics.AddError("Error listing domains", formatAPIError(err))
+	domains, err := d.client.Domains.ListDomains(ctx, opts)
+	if err != nil {
+		resp.Diagnostics.AddError("Error listing domains", formatAPIError(err))
+		return
+	}
+	values := make([]attr.Value, len(domains))
+	for i := range domains {
+		var statusTags []string
+		if withStatusTags {
+			statusTags = statusTagTypesToStrings(domains[i].StatusTags)
+		}
+		obj, diags := domainListItemObject(ctx, &domains[i], statusTags)
+		resp.Diagnostics.Append(diags...)
+		if resp.Diagnostics.HasError() {
 			return
 		}
-		values = make([]attr.Value, len(rawDomains))
-		for i := range rawDomains {
-			obj, diags := domainListItemObject(ctx, &rawDomains[i].Domain, statusTagTypesToStrings(rawDomains[i].StatusTags))
-			resp.Diagnostics.Append(diags...)
-			if resp.Diagnostics.HasError() {
-				return
-			}
-			values[i] = obj
-		}
-	} else {
-		domains, err := d.client.Domains.ListDomains(ctx, opts)
-		if err != nil {
-			resp.Diagnostics.AddError("Error listing domains", formatAPIError(err))
-			return
-		}
-		values = make([]attr.Value, len(domains))
-		for i := range domains {
-			obj, diags := domainListItemObject(ctx, &domains[i], nil)
-			resp.Diagnostics.Append(diags...)
-			if resp.Diagnostics.HasError() {
-				return
-			}
-			values[i] = obj
-		}
+		values[i] = obj
 	}
 
 	list, diags := types.ListValue(objType, values)
