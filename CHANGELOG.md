@@ -7,33 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Added
+## [1.3.0] - 2026-10-23
 
-- **`opusdns_domain` transfer-in support** — set `transfer = true` with an
-  `auth_code` to transfer an existing domain in from another registrar
-  (`POST /v1/domains/transfer`) instead of registering a new one. `create_zone`
-  is not supported for transfers, and `period_unit` must be `y` (the transfer
-  API accepts a year count only). The transferred domain is then managed
-  identically to a registered one. Backwards compatible: `transfer` defaults to
-  `false`, so existing configurations are unaffected.
+> **Upgrade note:** this release removes and reshapes data-source attributes
+> (see **Changed** and **Removed**). A `~> 1.0` version constraint picks it up;
+> pin `~> 1.2.0` to stay on 1.2.x until your configuration is updated.
 
 ### Changed
 
-- **Upgraded `opusdns-go-client` `v1.3.1` → `v1.3.2`**, which resends a
-  request the API answers with a 409 or 503 and a `Retry-After` header. The API
-  answers `409 ERROR_DOMAIN_SUBSCRIPTION_PENDING` when a domain is deleted in
-  the seconds before its registration is finalized, so destroying an
-  `opusdns_domain` right after creating it now waits and succeeds instead of
-  failing.
-- **Upgraded `opusdns-go-client` `v1.3.0` → `v1.3.1`**, whose `ListTLDs`
-  reads the full TLD specification the list endpoint sends (see **Fixed**).
-- **Upgraded `opusdns-go-client` `v1.1.1` → `v1.3.0`** (OpusDNS API spec
+- **Upgraded `opusdns-go-client` `v1.1.1` → `v1.3.2`** (OpusDNS API spec
   1.147.0 → 1.243.0; see the
-  [v1.3.0 release notes](https://github.com/OpusDNS/opusdns-go-client/releases/tag/v1.3.0)).
-  The SDK now decodes the API's real response shapes, so several data-source
-  schemas changed (see below and **Removed**). The SDK also no longer resends
-  POST/PATCH/DELETE requests after a 5xx or dropped connection, and rejects
-  requests with an empty ID before sending them.
+  [v1.3.0](https://github.com/OpusDNS/opusdns-go-client/releases/tag/v1.3.0),
+  [v1.3.1](https://github.com/OpusDNS/opusdns-go-client/releases/tag/v1.3.1)
+  and [v1.3.2](https://github.com/OpusDNS/opusdns-go-client/releases/tag/v1.3.2)
+  release notes). The SDK now decodes the API's real response shapes, so
+  several data-source schemas changed (see below and **Removed**). The SDK also:
+  - no longer resends POST/PATCH/DELETE requests after a 5xx or dropped
+    connection, and rejects requests with an empty ID before sending them;
+  - resends a request the API answers with a 409 or 503 and a `Retry-After`
+    header. The API answers `409 ERROR_DOMAIN_SUBSCRIPTION_PENDING` when a
+    domain is deleted in the seconds before its registration is finalized, so
+    destroying an `opusdns_domain` right after creating it now waits and
+    succeeds instead of failing.
 - **`opusdns_tld`** is reshaped to the TLD specification the API returns:
   - `idn_supported`, `dnssec_supported`, `min_domain_length`,
     `max_domain_length`, `whois_server`, `rdap_server`, `nameserver_config`
@@ -54,20 +49,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   unchanged; `expiring_within_30_days` / `expiring_within_90_days` are `null`
   when the API reports no expiry counts, and `total_domains` includes
   sub-organizations.
-- **Upgraded `opusdns-go-client` `v1.0.10` → `v1.1.1`.** This refreshes the SDK
-  data models against the current OpusDNS API. As a result, several data-source
-  schemas changed to match fields the API no longer returns (see **Removed**),
-  and the `opusdns_domain_suggestions` output was reshaped (see below).
-- **`opusdns_domain_suggestions`** now reflects the current suggest API: each
-  suggestion exposes `available` (bool) and `premium` (bool) instead of `status`
-  and `score`, and pricing is split into `price` and `renewal_price` objects with
-  `amount`/`currency`/`period` fields (replacing the previous
-  `register_price`/`renew_price`/`transfer_price` shape). The request filter
-  `include_unavailable` was replaced by `premium`.
-- **`opusdns_event` / `opusdns_events`** now expose `acknowledged_on` and no
-  longer expose the removed audit fields (see **Removed**).
-- Rewrote `RELEASING.md` to document the HCP Terraform Registry workflow.
-- Corrected the license metadata in `README.md`.
 
 ### Deprecated
 
@@ -79,14 +60,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Removed
 
-- **Fields dropped from data sources because the current API no longer returns
-  them** (SDK `v1.1.1` model refresh). Configurations referencing these
-  attributes must be updated:
-  - `opusdns_contact` / `opusdns_contacts`: `verified`, `verified_on`
-    (the `verified` filter on `opusdns_contacts` was removed too, see below).
-  - `opusdns_event` / `opusdns_events`: `organization_id`, `user_id`,
-    `ip_address`, `user_agent`, `source`.
-  - `opusdns_events`: the `created_after` / `created_before` request filters.
 - **Removed with the `opusdns-go-client` `v1.3.0` upgrade** (the current API no
   longer returns or accepts them). Configurations referencing these must be
   updated:
@@ -120,6 +93,84 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `TLDs.GetPortfolio` schema mismatch is retained. SDK `v1.3.0` now returns
   `[]models.TLDPortfolioEntry` for the bare-array response, so the workaround
   can be dropped in a follow-up.
+
+## [1.2.1] - 2026-07-16
+
+### Changed
+
+- `opusdns_user` (data source and resource) and `opusdns_users`: `status` is
+  deprecated and always `null`, because the OpusDNS API no longer returns a
+  user status.
+
+## [1.2.0] - 2026-07-16
+
+### Added
+
+- **Resources** `opusdns_role` (custom organization roles) and
+  `opusdns_vanity_nameserver_set`.
+- **Data sources** `opusdns_role_permissions`, `opusdns_vanity_nameserver_set`
+  and `opusdns_vanity_nameserver_sets`.
+- `opusdns_domain`: `expected_price` to confirm a premium registration, and
+  `claims_notice_acceptance_hash` to register a name that matches a TMCH
+  trademark claim.
+- `opusdns_zone` (resource and data source): `vanity_nameserver_set_id`.
+- `opusdns_domains`: the `status_tags` / `status_tag_mode` filters and
+  `status_tags` on each domain. `opusdns_domain`: `status_tags`, filled when
+  `include_tags` is set.
+
+### Changed
+
+- **`opusdns_user_role_assignment`** manages the single role of a user
+  (`role`, via `PUT /v1/users/{user_id}/role`) instead of a set of roles
+  (`roles`). Configurations using `roles` must be updated.
+- **`opusdns_roles`** returns a `roles` list (`label`, `name`, `description`,
+  `built_in`, `permissions`) instead of `role_names` and `roles_json`.
+
+## [1.1.0] - 2026-07-07
+
+### Added
+
+- **`opusdns_domain` transfer-in support** — set `transfer = true` with an
+  `auth_code` to transfer an existing domain in from another registrar
+  (`POST /v1/domains/transfer`) instead of registering a new one. `create_zone`
+  is not supported for transfers, and `period_unit` must be `y` (the transfer
+  API accepts a year count only). The transferred domain is then managed
+  identically to a registered one. Backwards compatible: `transfer` defaults to
+  `false`, so existing configurations are unaffected.
+
+### Changed
+
+- **Upgraded `opusdns-go-client` `v1.0.10` → `v1.1.1`.** This refreshes the SDK
+  data models against the current OpusDNS API. As a result, several data-source
+  schemas changed to match fields the API no longer returns (see **Removed**),
+  and the `opusdns_domain_suggestions` output was reshaped (see below).
+- **`opusdns_domain_suggestions`** now reflects the current suggest API: each
+  suggestion exposes `available` (bool) and `premium` (bool) instead of `status`
+  and `score`, and pricing is split into `price` and `renewal_price` objects with
+  `amount`/`currency`/`period` fields (replacing the previous
+  `register_price`/`renew_price`/`transfer_price` shape). The request filter
+  `include_unavailable` was replaced by `premium`.
+- **`opusdns_event` / `opusdns_events`** now expose `acknowledged_on` and no
+  longer expose the removed audit fields (see **Removed**).
+- Rewrote `RELEASING.md` to document the HCP Terraform Registry workflow.
+- Corrected the license metadata in `README.md`.
+
+### Removed
+
+- **Fields dropped from data sources because the current API no longer returns
+  them** (SDK `v1.1.1` model refresh). Configurations referencing these
+  attributes must be updated:
+  - `opusdns_contact` / `opusdns_contacts`: `verified`, `verified_on`
+    (the `verified` *filter* on `opusdns_contacts` is retained).
+  - `opusdns_event` / `opusdns_events`: `organization_id`, `user_id`,
+    `ip_address`, `user_agent`, `source`.
+  - `opusdns_events`: the `created_after` / `created_before` request filters.
+
+### Notes
+
+- The `opusdns_tld_portfolio` raw-HTTP workaround for the SDK's
+  `TLDs.GetPortfolio` schema mismatch is retained pending verification that the
+  `v1.1.1` `TLDPortfolio` model matches the bare-array API response.
 
 ## [1.0.1] - 2026-05-21
 
@@ -187,7 +238,11 @@ on `terraform-plugin-framework`.
   release because the API does not offer lifecycle semantics that fit
   Terraform. Organization read-only data sources remain.
 
-[Unreleased]: https://github.com/OpusDNS/terraform-provider-opusdns/compare/v1.0.1...HEAD
+[Unreleased]: https://github.com/OpusDNS/terraform-provider-opusdns/compare/v1.3.0...HEAD
+[1.3.0]: https://github.com/OpusDNS/terraform-provider-opusdns/compare/v1.2.1...v1.3.0
+[1.2.1]: https://github.com/OpusDNS/terraform-provider-opusdns/compare/v1.2.0...v1.2.1
+[1.2.0]: https://github.com/OpusDNS/terraform-provider-opusdns/compare/v1.1.0...v1.2.0
+[1.1.0]: https://github.com/OpusDNS/terraform-provider-opusdns/compare/v1.0.1...v1.1.0
 [1.0.1]: https://github.com/OpusDNS/terraform-provider-opusdns/compare/v1.0.0...v1.0.1
 [1.0.0]: https://github.com/OpusDNS/terraform-provider-opusdns/releases/tag/v1.0.0
 All notable changes to this provider are documented in this file.
