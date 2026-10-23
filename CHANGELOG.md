@@ -19,6 +19,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Upgraded `opusdns-go-client` `v1.3.1` → `v1.3.2`**, which resends a
+  request the API answers with a 409 or 503 and a `Retry-After` header. The API
+  answers `409 ERROR_DOMAIN_SUBSCRIPTION_PENDING` when a domain is deleted in
+  the seconds before its registration is finalized, so destroying an
+  `opusdns_domain` right after creating it now waits and succeeds instead of
+  failing.
 - **Upgraded `opusdns-go-client` `v1.3.0` → `v1.3.1`**, whose `ListTLDs`
   reads the full TLD specification the list endpoint sends (see **Fixed**).
 - **Upgraded `opusdns-go-client` `v1.1.1` → `v1.3.0`** (OpusDNS API spec
